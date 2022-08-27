@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_qsort - GA population sorting routines.
-  Copyright ©2000-2004, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:

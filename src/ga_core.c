@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_core - Genetic algorithm routines.
-  Copyright ©2000-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -273,7 +273,7 @@ static void destruct_list(population *pop, SLList *list)
   last updated: 16 Feb 2005
  **********************************************************************/
 
-population *ga_population_new(	const int stable_size,
+GAULFUNC population *ga_population_new(	const int stable_size,
 				const int num_chromosome,
 				const int len_chromosome)
   {
@@ -295,6 +295,8 @@ population *ga_population_new(	const int stable_size,
   newpop->island = -1;
   newpop->generation = 0;
 
+  newpop->fitness_dimensions = 0;
+
   newpop->crossover_ratio = GA_DEFAULT_CROSSOVER_RATIO;
   newpop->mutation_ratio = GA_DEFAULT_MUTATION_RATIO;
   newpop->migration_ratio = GA_DEFAULT_MIGRATION_RATIO;
@@ -308,7 +310,7 @@ population *ga_population_new(	const int stable_size,
   newpop->allele_max_double = DBL_MAX;
 
   THREAD_LOCK_NEW(newpop->lock);
-#if USE_CHROMO_CHUNKS == 1
+#ifdef USE_CHROMO_CHUNKS
   THREAD_LOCK_NEW(newpop->chromo_chunk_lock);
 #endif
 
@@ -339,6 +341,7 @@ population *ga_population_new(	const int stable_size,
   newpop->dc_params = NULL;
   newpop->gradient_params = NULL;
   newpop->search_params = NULL;
+  newpop->de_params = NULL;
   newpop->sampling_params = NULL;
   
 /*
@@ -350,6 +353,9 @@ population *ga_population_new(	const int stable_size,
 
   newpop->data_destructor = NULL;
   newpop->data_ref_incrementor = NULL;
+
+  newpop->population_data_destructor = NULL;
+  newpop->population_data_copy = NULL;
 
   newpop->chromosome_constructor = NULL;
   newpop->chromosome_destructor = NULL;
@@ -371,7 +377,7 @@ population *ga_population_new(	const int stable_size,
 /*
  * Efficient memory chunks for chromosome handling.
  */
-#if USE_CHROMO_CHUNKS == 1
+#ifdef USE_CHROMO_CHUNKS
   newpop->chromoarray_chunk = NULL;
   newpop->chromo_chunk = NULL;
 #endif
@@ -403,7 +409,7 @@ population *ga_population_new(	const int stable_size,
   last updated: 16 Feb 2005
  **********************************************************************/
 
-population *ga_population_clone_empty(population *pop)
+GAULFUNC population *ga_population_clone_empty(population *pop)
   {
   int		i;		/* Loop variable. */
   population	*newpop=NULL;	/* New population structure. */
@@ -415,7 +421,8 @@ population *ga_population_clone_empty(population *pop)
 /*
  * Allocate new structure.
  */
-  newpop = s_malloc(sizeof(population));
+  if ( !(newpop = s_malloc(sizeof(population))) )
+    die("Unable to allocate memory");
 
 /*
  * Clone parameters.
@@ -426,8 +433,11 @@ population *ga_population_clone_empty(population *pop)
   newpop->orig_size = 0;
   newpop->num_chromosomes = pop->num_chromosomes;
   newpop->len_chromosomes = pop->len_chromosomes;
-  newpop->data = pop->data;
   newpop->free_index = pop->max_size-1;
+  newpop->island = -1;
+  newpop->generation = 0;
+
+  newpop->fitness_dimensions = 0;
 
   newpop->crossover_ratio = pop->crossover_ratio;
   newpop->mutation_ratio = pop->mutation_ratio;
@@ -442,7 +452,7 @@ population *ga_population_clone_empty(population *pop)
   newpop->allele_max_double = newpop->allele_max_double;
 
   THREAD_LOCK_NEW(newpop->lock);
-#if USE_CHROMO_CHUNKS == 1
+#ifdef USE_CHROMO_CHUNKS
   THREAD_LOCK_NEW(newpop->chromo_chunk_lock);
 #endif
 
@@ -454,6 +464,9 @@ population *ga_population_clone_empty(population *pop)
 
   newpop->data_destructor = pop->data_destructor;
   newpop->data_ref_incrementor = pop->data_ref_incrementor;
+
+  newpop->population_data_destructor = pop->population_data_destructor;
+  newpop->population_data_copy = pop->population_data_copy;
 
   newpop->chromosome_constructor = pop->chromosome_constructor;
   newpop->chromosome_destructor = pop->chromosome_destructor;
@@ -475,13 +488,27 @@ population *ga_population_clone_empty(population *pop)
 /*
  * Copy optional parameter data.
  */
+  if (pop->data == NULL)
+  {
+      newpop->data = NULL;
+  }
+  else if (pop->population_data_copy)
+  {
+      newpop->data = pop->population_data_copy(pop->data);
+  }
+  else
+  {
+      newpop->data = pop->data;
+  }
+
   if (pop->tabu_params == NULL)
     {
     newpop->tabu_params = NULL;
     }
   else
     {
-    newpop->tabu_params = s_malloc(sizeof(ga_tabu_t));
+    if ( !(newpop->tabu_params = s_malloc(sizeof(ga_tabu_t))) )
+      die("Unable to allocate memory");
 
     newpop->tabu_params->tabu_accept = pop->tabu_params->tabu_accept;
     newpop->tabu_params->list_length = pop->tabu_params->list_length;
@@ -494,7 +521,9 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->sa_params = s_malloc(sizeof(ga_sa_t));
+    if ( !(newpop->sa_params = s_malloc(sizeof(ga_sa_t))) )
+      die("Unable to allocate memory");
+
     newpop->sa_params->sa_accept = pop->sa_params->sa_accept;
     newpop->sa_params->initial_temp = pop->sa_params->initial_temp;
     newpop->sa_params->final_temp = pop->sa_params->final_temp;
@@ -509,7 +538,8 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->climbing_params = s_malloc(sizeof(ga_climbing_t));
+    if ( !(newpop->climbing_params = s_malloc(sizeof(ga_climbing_t))) )
+      die("Unable to allocate memory");
 
     newpop->climbing_params->mutate_allele = pop->climbing_params->mutate_allele;
     }
@@ -520,12 +550,16 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->simplex_params = s_malloc(sizeof(ga_simplex_t));
+    if ( !(newpop->simplex_params = s_malloc(sizeof(ga_simplex_t))) )
+      die("Unable to allocate memory");
 
-    newpop->climbing_params->mutate_allele = pop->climbing_params->mutate_allele;
     newpop->simplex_params->to_double = pop->simplex_params->to_double;
     newpop->simplex_params->from_double = pop->simplex_params->from_double;
     newpop->simplex_params->dimensions = pop->simplex_params->dimensions;
+	newpop->simplex_params->step = pop->simplex_params->step;
+	newpop->simplex_params->alpha = pop->simplex_params->alpha;
+    newpop->simplex_params->beta = pop->simplex_params->beta;
+	newpop->simplex_params->gamma = pop->simplex_params->gamma;
     }
 
   if (pop->dc_params == NULL)
@@ -534,7 +568,8 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->dc_params = s_malloc(sizeof(ga_dc_t));
+    if ( !(newpop->dc_params = s_malloc(sizeof(ga_dc_t))) )
+      die("Unable to allocate memory");
 
     newpop->dc_params->compare = pop->dc_params->compare;
     }
@@ -545,13 +580,15 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->gradient_params = s_malloc(sizeof(ga_gradient_t));
+    if ( !(newpop->gradient_params = s_malloc(sizeof(ga_gradient_t))) )
+      die("Unable to allocate memory");
 
-    newpop->gradient_params->to_double = newpop->gradient_params->to_double;
-    newpop->gradient_params->from_double = newpop->gradient_params->from_double;
-    newpop->gradient_params->gradient = newpop->gradient_params->gradient;
-    newpop->gradient_params->step_size = newpop->gradient_params->step_size;
-    newpop->gradient_params->dimensions = newpop->gradient_params->dimensions;
+    newpop->gradient_params->to_double = pop->gradient_params->to_double;
+    newpop->gradient_params->from_double = pop->gradient_params->from_double;
+    newpop->gradient_params->gradient = pop->gradient_params->gradient;
+    newpop->gradient_params->step_size = pop->gradient_params->step_size;
+    newpop->gradient_params->dimensions = pop->gradient_params->dimensions;
+	newpop->gradient_params->alpha = pop->gradient_params->alpha;
     }
 
   if (pop->search_params == NULL)
@@ -560,11 +597,29 @@ population *ga_population_clone_empty(population *pop)
     }
   else
     {
-    newpop->search_params = s_malloc(sizeof(ga_search_t));
+    if ( !(newpop->search_params = s_malloc(sizeof(ga_search_t))) )
+      die("Unable to allocate memory");
 
     newpop->search_params->scan_chromosome = pop->search_params->scan_chromosome;
     newpop->search_params->chromosome_state = 0;
     newpop->search_params->allele_state = 0;
+    }
+
+  if (pop->de_params == NULL)
+    {
+    newpop->de_params = NULL;
+    }
+  else
+    {
+    if ( !(newpop->de_params = s_malloc(sizeof(ga_de_t))) )
+      die("Unable to allocate memory");
+
+    newpop->de_params->strategy = pop->de_params->strategy;
+    newpop->de_params->crossover_method = pop->de_params->crossover_method;
+    newpop->de_params->num_perturbed = pop->de_params->num_perturbed;
+    newpop->de_params->crossover_factor = pop->de_params->crossover_factor;
+    newpop->de_params->weighting_min = pop->de_params->weighting_min;
+    newpop->de_params->weighting_max = pop->de_params->weighting_max;
     }
 
   if (newpop->sampling_params == NULL)
@@ -575,14 +630,16 @@ population *ga_population_clone_empty(population *pop)
     {
     newpop->sampling_params = NULL;
 
-    plog(LOG_FIXME, "Probabilistic sampling parameters not copied.");
+	newpop->sampling_params->num_states = pop->sampling_params->num_states;
     }
 
 /*
  * Allocate arrays etc.
  */
-  newpop->entity_array = s_malloc(newpop->max_size*sizeof(entity*));
-  newpop->entity_iarray = s_malloc(newpop->max_size*sizeof(entity*));
+  if ( !(newpop->entity_array = s_malloc(newpop->max_size*sizeof(entity*))) )
+    die("Unable to allocate memory");
+  if ( !(newpop->entity_iarray = s_malloc(newpop->max_size*sizeof(entity*))) )
+    die("Unable to allocate memory");
   newpop->entity_chunk = mem_chunk_new(sizeof(entity), 512);
   
 /*
@@ -624,7 +681,7 @@ population *ga_population_clone_empty(population *pop)
   last updated: 24 May 2002
  **********************************************************************/
 
-population *ga_population_clone(population *pop)
+GAULFUNC population *ga_population_clone(population *pop)
   {
   int		i;		/* Loop variable. */
   population	*newpop=NULL;	/* New population structure. */
@@ -661,7 +718,7 @@ population *ga_population_clone(population *pop)
   last updated: 15 Aug 2002
  **********************************************************************/
 
-int ga_get_num_populations(void)
+GAULFUNC int ga_get_num_populations(void)
   {
   int	num=-1;
 
@@ -684,7 +741,7 @@ int ga_get_num_populations(void)
   last updated: 15 Aug 2002
  **********************************************************************/
 
-population *ga_get_population_from_id(unsigned int id)
+GAULFUNC population *ga_get_population_from_id(unsigned int id)
   {
   population	*pop=NULL;	/* The population pointer to return. */
 
@@ -707,7 +764,7 @@ population *ga_get_population_from_id(unsigned int id)
   last updated: 15 Aug 2002
  **********************************************************************/
 
-unsigned int ga_get_population_id(population *pop)
+GAULFUNC unsigned int ga_get_population_id(population *pop)
   {
   unsigned int	id=TABLE_ERROR_INDEX;	/* Internal population id. */
 
@@ -732,7 +789,7 @@ unsigned int ga_get_population_id(population *pop)
   last updated: 15 Aug 2002
  **********************************************************************/
 
-unsigned int *ga_get_all_population_ids(void)
+GAULFUNC unsigned int *ga_get_all_population_ids(void)
   {
   unsigned int	*ids=NULL;	/* Array of ids. */
 
@@ -756,7 +813,7 @@ unsigned int *ga_get_all_population_ids(void)
   last updated: 15 Aug 2002
  **********************************************************************/
 
-population **ga_get_all_populations(void)
+GAULFUNC population **ga_get_all_populations(void)
   {
   population	**pops=NULL;	/* Array of all population pointers. */
 
@@ -781,7 +838,7 @@ population **ga_get_all_populations(void)
   last updated:	28/02/01
  **********************************************************************/
 
-boolean ga_entity_seed(population *pop, entity *adam)
+GAULFUNC boolean ga_entity_seed(population *pop, entity *adam)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -836,7 +893,7 @@ boolean gaul_population_fill(population *pop, int num)
   last updated: 24 Feb 2005
  **********************************************************************/
 
-boolean ga_population_seed(population *pop)
+GAULFUNC boolean ga_population_seed(population *pop)
   {
 
   plog(LOG_DEBUG, "Population seeding by user-defined genesis.");
@@ -854,7 +911,7 @@ boolean ga_population_seed(population *pop)
   last updated: 10 Apr 2003
  **********************************************************************/
 
-int ga_funclookup_ptr_to_id(void *func)
+GAULFUNC int ga_funclookup_ptr_to_id(void *func)
   {
   int	id=1;	/* Index into lookup table. */
 
@@ -881,7 +938,7 @@ int ga_funclookup_ptr_to_id(void *func)
   last updated: 10 Apr 2003
  **********************************************************************/
 
-int ga_funclookup_label_to_id(char *funcname)
+GAULFUNC int ga_funclookup_label_to_id(char *funcname)
   {
   int	id=1;	/* Index into lookup table. */
 
@@ -908,7 +965,7 @@ int ga_funclookup_label_to_id(char *funcname)
   last updated: 10 Apr 2003
  **********************************************************************/
 
-void *ga_funclookup_label_to_ptr(char *funcname)
+GAULFUNC void *ga_funclookup_label_to_ptr(char *funcname)
   {
   int	id=1;	/* Index into lookup table. */
 
@@ -934,7 +991,7 @@ void *ga_funclookup_label_to_ptr(char *funcname)
   last updated: 10 Apr 2003
  **********************************************************************/
 
-void *ga_funclookup_id_to_ptr(int id)
+GAULFUNC void *ga_funclookup_id_to_ptr(int id)
   {
 
 #if GA_DEBUG>2
@@ -953,7 +1010,7 @@ void *ga_funclookup_id_to_ptr(int id)
   last updated: 10 Apr 2003
  **********************************************************************/
 
-char *ga_funclookup_id_to_label(int id)
+GAULFUNC char *ga_funclookup_id_to_label(int id)
   {
 
 #if GA_DEBUG>2
@@ -968,22 +1025,22 @@ char *ga_funclookup_id_to_label(int id)
   ga_entity_evaluate()
   synopsis:	Score a single entity.
   parameters:	population *pop
-		entity *entity
+		entity *this_entity
   return:	double			the fitness
   last updated: 01 Jul 2004
  **********************************************************************/
 
-double ga_entity_evaluate(population *pop, entity *entity)
+GAULFUNC double ga_entity_evaluate(population *pop, entity *this_entity)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
-  if ( !entity ) die("Null pointer to entity structure passed.");
+  if ( !this_entity ) die("Null pointer to entity structure passed.");
   if ( !pop->evaluate ) die("Evaluation callback not defined.");
 
-  if (pop->evaluate(pop, entity) == FALSE)
-    entity->fitness = GA_MIN_FITNESS;
+  if (pop->evaluate(pop, this_entity) == FALSE)
+    this_entity->fitness = GA_MIN_FITNESS;
 
-  return entity->fitness;
+  return this_entity->fitness;
   }
 
 
@@ -997,7 +1054,7 @@ double ga_entity_evaluate(population *pop, entity *entity)
   last updated: 28/02/01
  **********************************************************************/
 
-boolean ga_population_score_and_sort(population *pop)
+GAULFUNC boolean ga_population_score_and_sort(population *pop)
   {
   int		i;		/* Loop variable over all entities. */
 #if GA_DEBUG>2
@@ -1051,7 +1108,7 @@ boolean ga_population_score_and_sort(population *pop)
   last updated: 30 May 2002
  **********************************************************************/
 
-boolean ga_population_sort(population *pop)
+GAULFUNC boolean ga_population_sort(population *pop)
   {
 
 /* Checks. */
@@ -1073,7 +1130,7 @@ FIXME: The following 3 functions need to be fixed for the new absracted chromoso
   last updated: 31/05/01
  **********************************************************************/
 
-double ga_population_convergence_genotypes( population *pop )
+GAULFUNC void ga_population_convergence_genotypes( population *pop )
   {
   int		i, j;		/* Loop over pairs of entities. */
   int		count=0, converged=0;	/* Number of comparisons, matches. */
@@ -1103,7 +1160,7 @@ double ga_population_convergence_genotypes( population *pop )
   last updated: 31/05/01
  **********************************************************************/
 
-double ga_population_convergence_chromosomes( population *pop )
+GAULFUNC void ga_population_convergence_chromosomes( population *pop )
   {
   int		i, j;		/* Loop over pairs of entities. */
   int		k;		/* Loop over chromosomes. */
@@ -1140,7 +1197,7 @@ double ga_population_convergence_chromosomes( population *pop )
   last updated: 31/05/01
  **********************************************************************/
 
-double ga_population_convergence_alleles( population *pop )
+GAULFUNC void ga_population_convergence_alleles( population *pop )
   {
   int		i, j;		/* Loop over pairs of entities. */
   int		k;		/* Loop over chromosomes. */
@@ -1178,7 +1235,7 @@ double ga_population_convergence_alleles( population *pop )
   last updated: 22/01/01
  **********************************************************************/
 
-int ga_get_entity_rank(population *pop, entity *e)
+GAULFUNC int ga_get_entity_rank(population *pop, entity *e)
   {
   int	rank=0;		/* The rank. */
 
@@ -1202,7 +1259,7 @@ int ga_get_entity_rank(population *pop, entity *e)
   last updated: 18 Mar 2002
  **********************************************************************/
 
-int ga_get_entity_rank_from_id(population *pop, int id)
+GAULFUNC int ga_get_entity_rank_from_id(population *pop, int id)
   {
   int	rank=0;		/* The rank. */
 
@@ -1224,7 +1281,7 @@ int ga_get_entity_rank_from_id(population *pop, int id)
   last updated: 18 Mar 2002
  **********************************************************************/
 
-int ga_get_entity_id_from_rank(population *pop, int rank)
+GAULFUNC int ga_get_entity_id_from_rank(population *pop, int rank)
   {
   int	id=0;		/* The entity's index. */
 
@@ -1247,7 +1304,7 @@ int ga_get_entity_id_from_rank(population *pop, int rank)
   last updated: 18 Mar 2002
  **********************************************************************/
 
-int ga_get_entity_id(population *pop, entity *e)
+GAULFUNC int ga_get_entity_id(population *pop, entity *e)
   {
   int	id=0;	/* The index. */
 
@@ -1273,11 +1330,11 @@ int ga_get_entity_id(population *pop, entity *e)
   last updated: 29 Apr 2002
  **********************************************************************/
 
-entity *ga_get_entity_from_id(population *pop, const unsigned int id)
+GAULFUNC entity *ga_get_entity_from_id(population *pop, const unsigned int id)
   {
   if ( !pop ) die("Null pointer to population structure passed.");
 
-  if ( id>pop->max_size ) return NULL;
+  if ( (int) id>pop->max_size ) return NULL;
 
   return pop->entity_array[id];
   }
@@ -1294,11 +1351,11 @@ entity *ga_get_entity_from_id(population *pop, const unsigned int id)
   last updated: 29 Apr 2004
  **********************************************************************/
 
-entity *ga_get_entity_from_rank(population *pop, const unsigned int rank)
+GAULFUNC entity *ga_get_entity_from_rank(population *pop, const unsigned int rank)
   {
   if ( !pop ) die("Null pointer to population structure passed.");
 
-  if ( rank>pop->size ) return NULL;
+  if ( rank > (unsigned) pop->size ) return NULL;
 
   return pop->entity_iarray[rank];
   }
@@ -1310,11 +1367,12 @@ entity *ga_get_entity_from_rank(population *pop, const unsigned int rank)
 		Chromosomes are allocated, but will contain garbage.
   parameters:
   return:
-  last updated: 18 Mar 2002
+  last updated: 24 Apr 2005
  **********************************************************************/
 
 static boolean ga_entity_setup(population *pop, entity *joe)
   {
+  int	i;	/* Loop variable over the fitness vector. */
 
   if (!joe)
     die("Null pointer to entity structure passed.");
@@ -1329,7 +1387,21 @@ static boolean ga_entity_setup(population *pop, entity *joe)
   joe->data=NULL;
 
 /* No fitness evaluated yet. */
-  joe->fitness=GA_MIN_FITNESS;
+  joe->fitness = GA_MIN_FITNESS;
+
+  if ( pop->fitness_dimensions > 0 )
+    { /* This population is being used for multiobjective optimisation. */
+    if ( !(joe->fitvector = s_malloc(sizeof(double)*pop->fitness_dimensions)) )
+      die("Unable to allocate memory");
+
+    /* Clear multiobjective fitness vector. */
+    for (i=0; i<pop->fitness_dimensions; i++)
+      joe->fitvector[i] = GA_MIN_FITNESS;
+    }
+  else
+    {
+    joe->fitvector = NULL;
+    }
 
   return TRUE;
   }
@@ -1349,7 +1421,7 @@ static boolean ga_entity_setup(population *pop, entity *joe)
   last updated:	19 Mar 2002
  **********************************************************************/
 
-boolean ga_entity_dereference_by_rank(population *pop, int rank)
+GAULFUNC boolean ga_entity_dereference_by_rank(population *pop, int rank)
   {
   int		i;	/* Loop variable over the indexed array. */
   entity	*dying=pop->entity_iarray[rank];	/* Dead entity. */
@@ -1362,6 +1434,10 @@ boolean ga_entity_dereference_by_rank(population *pop, int rank)
     destruct_list(pop, dying->data);
     dying->data=NULL;
     }
+
+/* Free multiobjective fitness vector. */
+  if ( dying->fitvector != NULL )
+    s_free(dying->fitvector);
 
   THREAD_LOCK(pop->lock);
 
@@ -1407,7 +1483,7 @@ boolean ga_entity_dereference_by_rank(population *pop, int rank)
   last updated:	19 Mar 2002
  **********************************************************************/
 
-boolean ga_entity_dereference_by_id(population *pop, int id)
+GAULFUNC boolean ga_entity_dereference_by_id(population *pop, int id)
   {
   int		i;	/* Loop variable over the indexed array. */
   entity	*dying=pop->entity_array[id];	/* Dead entity. */
@@ -1418,8 +1494,12 @@ boolean ga_entity_dereference_by_id(population *pop, int id)
   if (dying->data)
     {
     destruct_list(pop, dying->data);
-    dying->data=NULL;
+    dying->data = NULL;
     }
+
+/* Free multiobjective fitness vector. */
+  if ( dying->fitvector != NULL )
+    s_free(dying->fitvector);
 
   THREAD_LOCK(pop->lock);
 
@@ -1464,7 +1544,7 @@ boolean ga_entity_dereference_by_id(population *pop, int id)
   last updated:	16/03/01
  **********************************************************************/
 
-boolean ga_entity_dereference(population *pop, entity *dying)
+GAULFUNC boolean ga_entity_dereference(population *pop, entity *dying)
   {
   return ga_entity_dereference_by_rank(pop, ga_get_entity_rank(pop, dying));
   }
@@ -1479,14 +1559,14 @@ boolean ga_entity_dereference(population *pop, entity *dying)
   last updated: 20/12/00
  **********************************************************************/
 
-void ga_entity_clear_data(population *p, entity *entity, const int chromosome)
+GAULFUNC void ga_entity_clear_data(population *p, entity *this_entity, const int chromosome)
   {
   SLList	*tmplist;
   vpointer	data;		/* Data in item. */
 
-  if (entity->data)
+  if (this_entity->data)
     {
-    tmplist = slink_nth(entity->data, chromosome);
+    tmplist = slink_nth(this_entity->data, chromosome);
     if ( (data = slink_data(tmplist)) )
       {
       p->data_destructor(data);
@@ -1511,17 +1591,23 @@ void ga_entity_clear_data(population *p, entity *entity, const int chromosome)
   last updated: 18/12/00
  **********************************************************************/
 
-void ga_entity_blank(population *p, entity *entity)
+GAULFUNC void ga_entity_blank(population *p, entity *this_entity)
   {
-  if (entity->data)
+  int	i;	/* Loop variable over the fitness vector. */
+
+  if (this_entity->data)
     {
-    destruct_list(p, entity->data);
-    entity->data=NULL;
+    destruct_list(p, this_entity->data);
+    this_entity->data=NULL;
     }
 
-  entity->fitness=GA_MIN_FITNESS;
+  this_entity->fitness=GA_MIN_FITNESS;
 
-/*  printf("ENTITY %d CLEARED.\n", ga_get_entity_id(p, entity));*/
+/* Clear multiobjective fitness vector. */
+  for (i=0; i<p->fitness_dimensions; i++)
+    this_entity->fitvector[i] = GA_MIN_FITNESS;
+
+/*  printf("ENTITY %d CLEARED.\n", ga_get_entity_id(p, this_entity));*/
 
   return;
   }
@@ -1533,11 +1619,11 @@ void ga_entity_blank(population *p, entity *entity)
 		population's entity pool.  Increments population size
 		too.
   parameters:	population *pop
-  return:	entity *entity
+  return:	entity *this_entity
   last updated: 18 Mar 2002
  **********************************************************************/
 
-entity *ga_get_free_entity(population *pop)
+GAULFUNC entity *ga_get_free_entity(population *pop)
   {
   int		new_max_size;	/* Increased maximum number of entities. */
   int		i;
@@ -1612,7 +1698,7 @@ entity *ga_get_free_entity(population *pop)
   last updated: 18/12/00
  **********************************************************************/
 
-boolean ga_copy_data(population *pop, entity *dest, entity *src, const int chromosome)
+GAULFUNC boolean ga_copy_data(population *pop, entity *dest, entity *src, const int chromosome)
   {
   vpointer	tmpdata=NULL;	/* Temporary pointer. */
 
@@ -1662,7 +1748,7 @@ static boolean ga_copy_chromosome( population *pop, entity *dest, entity *src,
   last updated: 20/12/00
  **********************************************************************/
 
-boolean ga_entity_copy_all_chromosomes(population *pop, entity *dest, entity *src)
+GAULFUNC boolean ga_entity_copy_all_chromosomes(population *pop, entity *dest, entity *src)
   {
   int		i;		/* Loop variable over all chromosomes. */
 
@@ -1696,7 +1782,7 @@ boolean ga_entity_copy_all_chromosomes(population *pop, entity *dest, entity *sr
   last updated: 22/01/01
  **********************************************************************/
 
-boolean ga_entity_copy_chromosome(population *pop, entity *dest, entity *src, int chromo)
+GAULFUNC boolean ga_entity_copy_chromosome(population *pop, entity *dest, entity *src, int chromo)
   {
 
 /* Checks. */
@@ -1732,7 +1818,7 @@ boolean ga_entity_copy_chromosome(population *pop, entity *dest, entity *src, in
   last updated:	22/01/01
  **********************************************************************/
 
-boolean ga_entity_copy(population *pop, entity *dest, entity *src)
+GAULFUNC boolean ga_entity_copy(population *pop, entity *dest, entity *src)
   {
 
   ga_entity_copy_all_chromosomes(pop, dest, src);
@@ -1753,7 +1839,7 @@ boolean ga_entity_copy(population *pop, entity *dest, entity *src)
   last updated:	07/07/01
  **********************************************************************/
 
-entity *ga_entity_clone(population *pop, entity *parent)
+GAULFUNC entity *ga_entity_clone(population *pop, entity *parent)
   {
   entity	*dolly;		/* The clone. */
 
@@ -1770,7 +1856,7 @@ entity *ga_entity_clone(population *pop, entity *parent)
   Network communication (population/entity migration) functions.
  **********************************************************************/
 
-#if W32_CRIPPLED != 1 && HAVE_MPI == 1
+#if !defined(W32_CRIPPLED) && defined(HAVE_MPI)
 
 /*
  * Convenience wrapper around MPI_COmm_rank().
@@ -1815,13 +1901,13 @@ static boolean mpi_receive(void *buf, const int count,
   last updated: 31 Jan 2002
  **********************************************************************/
 
-void ga_population_send_by_mask( population *pop, int dest_node, int num_to_send, boolean *send_mask )
+GAULFUNC void ga_population_send_by_mask( population *pop, int dest_node, int num_to_send, boolean *send_mask )
   {
   int		i;
   int		count=0;
   int		len=0;		/* Length of buffer to send. */
   unsigned int	max_len=0;
-  byte		*buffer=NULL;
+  gaulbyte		*buffer=NULL;
 
 /*
  * Send number of entities.
@@ -1882,12 +1968,12 @@ void ga_population_send_by_mask( population *pop, int dest_node, int num_to_send
   last updated: 31 Jan 2002
  **********************************************************************/
 
-void ga_population_send_every( population *pop, int dest_node )
+GAULFUNC void ga_population_send_every( population *pop, int dest_node )
   {
   int		i;
   int		len;			/* Length of buffer to send. */
   unsigned int	max_len=0;		/* Maximum length of buffer. */
-  byte		*buffer=NULL;
+  gaulbyte		*buffer=NULL;
 
   if ( !pop ) die("Null pointer to population structure passed.");
 
@@ -1935,13 +2021,13 @@ void ga_population_send_every( population *pop, int dest_node )
   last updated: 31 Jan 2002
  **********************************************************************/
 
-void ga_population_append_receive( population *pop, int src_node )
+GAULFUNC void ga_population_append_receive( population *pop, int src_node )
   {
   int		i;
   int		len=0;			/* Length of buffer to receive. */
-  byte		*buffer;		/* Receive buffer. */
+  gaulbyte		*buffer;		/* Receive buffer. */
   int		num_to_recv;		/* Number of entities to receive. */
-  entity	*entity;		/* New entity. */
+  entity	*this_entity;		/* New entity. */
 
   if ( !pop ) die("Null pointer to population structure passed.");
 
@@ -1959,7 +2045,8 @@ void ga_population_append_receive( population *pop, int src_node )
 
   if (num_to_recv>0)
     {
-    buffer = s_malloc(len*sizeof(byte));
+    if ( !(buffer = s_malloc(len*sizeof(gaulbyte))) )
+      die("Unable to allocate memory");
 
 /*
  * Receive all entities individually.
@@ -1995,7 +2082,7 @@ void ga_population_append_receive( population *pop, int src_node )
   last updated: 16 Feb 2005
  **********************************************************************/
 
-population *ga_population_new_receive( int src_node )
+GAULFUNC population *ga_population_new_receive( int src_node )
   {
   population *pop=NULL;
 
@@ -2024,7 +2111,7 @@ population *ga_population_new_receive( int src_node )
   last updated: 24 Jan 2002
  **********************************************************************/
 
-population *ga_population_receive( int src_node )
+GAULFUNC population *ga_population_receive( int src_node )
   {
   population *pop;
 
@@ -2047,7 +2134,7 @@ population *ga_population_receive( int src_node )
   last updated: 16 Feb 2005
  **********************************************************************/
 
-void ga_population_send( population *pop, int dest_node )
+GAULFUNC void ga_population_send( population *pop, int dest_node )
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -2075,7 +2162,7 @@ void ga_population_send( population *pop, int dest_node )
   last updated: 24 Jan 2002
  **********************************************************************/
 
-void ga_population_send_all( population *pop, int dest_node )
+GAULFUNC void ga_population_send_all( population *pop, int dest_node )
   {
 
   /* Note that checks are performed in the two called functions. */
@@ -2097,7 +2184,7 @@ void ga_population_send_all( population *pop, int dest_node )
   last updated: 22/09/00
  **********************************************************************/
 
-void ga_marktosend_entity(int *send_mask)
+GAULFUNC void ga_marktosend_entity(int *send_mask)
   {
   }
 #endif
@@ -2115,7 +2202,7 @@ void ga_marktosend_entity(int *send_mask)
   last updated:	18/12/00
  **********************************************************************/
 
-entity *ga_multiproc_compare_entities( population *pop, entity *localnew, entity *local )
+GAULFUNC entity *ga_multiproc_compare_entities( population *pop, entity *localnew, entity *local )
   {
   double	global_max;		/* Maximum value across all nodes. */
   int		maxnode;		/* Node with maximum value. */
@@ -2130,7 +2217,8 @@ entity *ga_multiproc_compare_entities( population *pop, entity *localnew, entity
   maxnode = mpi_find_global_max(MAX(localnew->fitness, local->fitness), &global_max);
 
   buffer_size = pop->num_chromosomes*pop->len_chromosomes;
-  buffer_ptr = buffer = s_malloc(buffer_size*sizeof(int));
+  if ( !(buffer_ptr = buffer = s_malloc(buffer_size*sizeof(int))) )
+    die("Unable to allocate memory");
 
   if (maxnode == mpi_get_rank())
     {
@@ -2185,7 +2273,7 @@ entity *ga_multiproc_compare_entities( population *pop, entity *localnew, entity
   last updated: 22/09/00
  **********************************************************************/
 
-boolean ga_sendrecv_entities( population *pop, int *send_mask, int send_count )
+GAULFUNC boolean ga_sendrecv_entities( population *pop, int *send_mask, int send_count )
   {
   int		i, j;			/* Loop over all chromosomes in all entities. */
   int		next, prev;		/* Processor to send/receive entities with. */
@@ -2315,7 +2403,7 @@ boolean ga_sendrecv_entities( population *pop, int *send_mask, int send_count )
   last updated: 24 Oct 2002
  **********************************************************************/
 
-entity *ga_optimise_entity(population *pop, entity *unopt)
+GAULFUNC entity *ga_optimise_entity(population *pop, entity *unopt)
   {
   entity	*optimised;
 
@@ -2351,7 +2439,7 @@ entity *ga_optimise_entity(population *pop, entity *unopt)
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_parameters(	population		*pop,
+GAULFUNC void ga_population_set_parameters(	population		*pop,
 					const ga_scheme_type	scheme,
 					const ga_elitism_type	elitism,
 					const double		crossover,
@@ -2384,7 +2472,7 @@ void ga_population_set_parameters(	population		*pop,
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_scheme(	population		*pop,
+GAULFUNC void ga_population_set_scheme(	population		*pop,
 				const ga_scheme_type	scheme)
   {
 
@@ -2406,7 +2494,7 @@ void ga_population_set_scheme(	population		*pop,
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_elitism(	population		*pop,
+GAULFUNC void ga_population_set_elitism(	population		*pop,
 				const ga_elitism_type	elitism)
   {
 
@@ -2428,7 +2516,7 @@ void ga_population_set_elitism(	population		*pop,
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_mutation(	population	*pop,
+GAULFUNC void ga_population_set_mutation(	population	*pop,
 					const double	mutation)
   {
 
@@ -2450,7 +2538,7 @@ void ga_population_set_mutation(	population	*pop,
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_migration(	population	*pop,
+GAULFUNC void ga_population_set_migration(	population	*pop,
 					const double	migration)
   {
 
@@ -2472,7 +2560,7 @@ void ga_population_set_migration(	population	*pop,
   last updated:	10 Jun 2002
  **********************************************************************/
 
-void ga_population_set_crossover(	population	*pop,
+GAULFUNC void ga_population_set_crossover(	population	*pop,
 					const double	crossover)
   {
 
@@ -2495,7 +2583,7 @@ void ga_population_set_crossover(	population	*pop,
   last updated:	16 Feb 2005
  **********************************************************************/
 
-void ga_population_set_allele_mutation_prob(	population	*pop,
+GAULFUNC void ga_population_set_allele_mutation_prob(	population	*pop,
 					const double	prob)
   {
 
@@ -2518,7 +2606,7 @@ void ga_population_set_allele_mutation_prob(	population	*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-void ga_population_set_allele_min_integer(	population	*pop,
+GAULFUNC void ga_population_set_allele_min_integer(	population	*pop,
 					const int	value)
   {
 
@@ -2541,7 +2629,7 @@ void ga_population_set_allele_min_integer(	population	*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-void ga_population_set_allele_max_integer(	population	*pop,
+GAULFUNC void ga_population_set_allele_max_integer(	population	*pop,
 					const int	value)
   {
 
@@ -2564,7 +2652,7 @@ void ga_population_set_allele_max_integer(	population	*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-void ga_population_set_allele_min_double(	population	*pop,
+GAULFUNC void ga_population_set_allele_min_double(	population	*pop,
 					const double	value)
   {
 
@@ -2587,7 +2675,7 @@ void ga_population_set_allele_min_double(	population	*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-void ga_population_set_allele_max_double(	population	*pop,
+GAULFUNC void ga_population_set_allele_max_double(	population	*pop,
 					const double	value)
   {
 
@@ -2611,7 +2699,7 @@ void ga_population_set_allele_max_double(	population	*pop,
   last updated:	15 Aug 2002
  **********************************************************************/
 
-population *ga_transcend(unsigned int id)
+GAULFUNC population *ga_transcend(unsigned int id)
   {
   population	*pop=NULL;	/* Transcending population. */
 
@@ -2642,7 +2730,7 @@ population *ga_transcend(unsigned int id)
   last updated:	15 Aug 2002
  **********************************************************************/
 
-unsigned int ga_resurect(population *pop)
+GAULFUNC unsigned int ga_resurect(population *pop)
   {
   unsigned int	id=TABLE_ERROR_INDEX;	/* Internal population id. */
 
@@ -2660,90 +2748,6 @@ unsigned int ga_resurect(population *pop)
   return id;
   }
 
-
-/**********************************************************************
-  ga_extinction()
-  synopsis:	Purge all memory used by a population, also remove
-		it from the population table.
-  parameters:
-  return:
-  last updated:	15 Aug 2002
- **********************************************************************/
-
-boolean ga_extinction(population *extinct)
-  {
-  unsigned int	id = TABLE_ERROR_INDEX;	/* Internal index for this extinct population. */
-
-  if ( !extinct ) die("Null pointer to population structure passed.");
-
-  plog(LOG_VERBOSE, "This population is becoming extinct!");
-
-/*
- * Remove this population from the population table.
- */
-  THREAD_LOCK(pop_table_lock);
-  if (pop_table)
-    {
-    id = table_remove_data(pop_table, extinct);
-    if (table_count_items(pop_table) < 1)
-      {
-      table_destroy(pop_table);
-      pop_table=NULL;
-      }
-    }
-  THREAD_UNLOCK(pop_table_lock);
-
-/*
- * Error check.
- */
-  if (id == TABLE_ERROR_INDEX)
-    die("Unable to find population structure in table.");
-
-/*
- * Any user-data?
- */
-  if (extinct->data)
-    plog(LOG_WARNING, "User data field is not empty. (Potential memory leak)");
-
-/*
- * Dereference/free everyting.
- */
-  if (!ga_genocide(extinct, 0))
-    {
-    plog(LOG_NORMAL, "This population is already extinct!");
-    }
-  else
-    {
-    s_free(extinct->entity_array);
-    s_free(extinct->entity_iarray);
-    mem_chunk_destroy(extinct->entity_chunk);
-
-#if USE_CHROMO_CHUNKS == 1
-    mem_chunk_destroy(extinct->chromo_chunk);
-    mem_chunk_destroy(extinct->chromoarray_chunk);
-#endif
-
-    if (extinct->tabu_params) s_free(extinct->tabu_params);
-    if (extinct->sa_params) s_free(extinct->sa_params);
-    if (extinct->dc_params) s_free(extinct->dc_params);
-    if (extinct->climbing_params) s_free(extinct->climbing_params);
-    if (extinct->simplex_params) s_free(extinct->simplex_params);
-    if (extinct->gradient_params) s_free(extinct->gradient_params);
-    if (extinct->search_params) s_free(extinct->search_params);
-    if (extinct->sampling_params) s_free(extinct->sampling_params);
-
-    THREAD_LOCK_FREE(extinct->lock);
-#if USE_CHROMO_CHUNKS == 1
-    THREAD_LOCK_FREE(extinct->chromo_chunk_lock);
-#endif
-
-    s_free(extinct);
-    }
-
-  return TRUE;
-  }
-
-
 /**********************************************************************
   ga_genocide()
   synopsis:	Kill entities to reduce population size down to
@@ -2753,7 +2757,7 @@ boolean ga_extinction(population *extinct)
   last updated:	22 Aug 2002
  **********************************************************************/
 
-boolean ga_genocide(population *pop, int target_size)
+GAULFUNC boolean ga_genocide(population *pop, int target_size)
   {
   if ( !pop ) return FALSE;
 
@@ -2785,12 +2789,12 @@ boolean ga_genocide(population *pop, int target_size)
   last updated:	01 Jul 2004
  **********************************************************************/
 
-boolean ga_genocide_by_fitness(population *pop, double target_fitness)
+GAULFUNC boolean ga_genocide_by_fitness(population *pop, double target_fitness)
   {
   if ( !pop ) return FALSE;
 
   plog(LOG_VERBOSE,
-            "The population is being culled at fitness %f!",
+            "The population of size %d is being culled at fitness %f!",
             pop->size, target_fitness);
 
 /*
@@ -2810,6 +2814,96 @@ boolean ga_genocide_by_fitness(population *pop, double target_fitness)
 
 
 /**********************************************************************
+  ga_extinction()
+  synopsis:	Purge all memory used by a population, also remove
+		it from the population table.
+  parameters:
+  return:
+  last updated:	15 Aug 2002
+ **********************************************************************/
+
+GAULFUNC boolean ga_extinction(population *extinct)
+  {
+  unsigned int	id = TABLE_ERROR_INDEX;	/* Internal index for this extinct population. */
+
+  if ( !extinct ) die("Null pointer to population structure passed.");
+
+  plog(LOG_VERBOSE, "This population is becoming extinct!");
+
+/*
+ * Remove this population from the population table.
+ */
+  THREAD_LOCK(pop_table_lock);
+  if (pop_table)
+    {
+    id = table_remove_data(pop_table, extinct);
+    if (table_count_items(pop_table) < 1)
+      {
+      table_destroy(pop_table);
+      pop_table=NULL;
+      }
+    }
+  THREAD_UNLOCK(pop_table_lock);
+
+/*
+ * Error check.
+ */
+  if (id == TABLE_ERROR_INDEX)
+    die("Unable to find population structure in table.");
+
+/*
+ * Dereference/free everyting.
+ */
+  if (!ga_genocide(extinct, 0))
+    {
+    plog(LOG_NORMAL, "This population is already extinct!");
+    }
+  else
+    {
+    s_free(extinct->entity_array);
+    s_free(extinct->entity_iarray);
+    mem_chunk_destroy(extinct->entity_chunk);
+
+#ifdef USE_CHROMO_CHUNKS
+    mem_chunk_destroy(extinct->chromo_chunk);
+    mem_chunk_destroy(extinct->chromoarray_chunk);
+#endif
+
+    if (extinct->tabu_params) s_free(extinct->tabu_params);
+    if (extinct->sa_params) s_free(extinct->sa_params);
+    if (extinct->dc_params) s_free(extinct->dc_params);
+    if (extinct->climbing_params) s_free(extinct->climbing_params);
+    if (extinct->simplex_params) s_free(extinct->simplex_params);
+    if (extinct->gradient_params) s_free(extinct->gradient_params);
+    if (extinct->search_params) s_free(extinct->search_params);
+    if (extinct->de_params) s_free(extinct->de_params);
+    if (extinct->sampling_params) s_free(extinct->sampling_params);
+
+    if (extinct->data)
+      {
+      if (extinct->population_data_destructor)
+        {
+        extinct->population_data_destructor(extinct->data);
+        }
+      else
+        {
+        plog(LOG_WARNING, "User data field is not empty. (Potential memory leak)");
+        }
+	  }
+
+    THREAD_LOCK_FREE(extinct->lock);
+#ifdef USE_CHROMO_CHUNKS
+    THREAD_LOCK_FREE(extinct->chromo_chunk_lock);
+#endif
+
+    s_free(extinct);
+    }
+
+  return TRUE;
+  }
+
+
+/**********************************************************************
   ga_entity_get_fitness()
   synopsis:	Gets an entity's fitness.
   parameters:
@@ -2817,10 +2911,10 @@ boolean ga_genocide_by_fitness(population *pop, double target_fitness)
   last updated: 23 May 2002
  **********************************************************************/
 
-double ga_entity_get_fitness(entity *e)
+GAULFUNC double ga_entity_get_fitness(entity *e)
   {
 
-  return e?e->fitness:GA_MIN_FITNESS;
+  return e ? e->fitness : GA_MIN_FITNESS;
   }
 
 
@@ -2832,7 +2926,7 @@ double ga_entity_get_fitness(entity *e)
   last updated: 23 May 2002
  **********************************************************************/
 
-boolean ga_entity_set_fitness(entity *e, double fitness)
+GAULFUNC boolean ga_entity_set_fitness(entity *e, double fitness)
   {
   if ( !e ) return FALSE;
 
@@ -2850,7 +2944,7 @@ boolean ga_entity_set_fitness(entity *e, double fitness)
   last updated: 23 May 2002
  **********************************************************************/
 
-int ga_population_get_stablesize(population *pop)
+GAULFUNC int ga_population_get_stablesize(population *pop)
   {
 
   return pop?pop->stable_size:0;
@@ -2865,7 +2959,7 @@ int ga_population_get_stablesize(population *pop)
   last updated: 23 May 2002
  **********************************************************************/
 
-int ga_population_get_size(population *pop)
+GAULFUNC int ga_population_get_size(population *pop)
   {
 
   return pop?pop->size:0;
@@ -2882,7 +2976,7 @@ int ga_population_get_size(population *pop)
   last updated: 23 May 2002
  **********************************************************************/
 
-int ga_population_get_maxsize(population *pop)
+GAULFUNC int ga_population_get_maxsize(population *pop)
   {
 
   return pop?pop->max_size:0;
@@ -2897,7 +2991,7 @@ int ga_population_get_maxsize(population *pop)
   last updated: 23 May 2002
  **********************************************************************/
 
-boolean ga_population_set_stablesize(population *pop, int stable_size)
+GAULFUNC boolean ga_population_set_stablesize(population *pop, int stable_size)
   {
   if ( !pop ) return FALSE;
 
@@ -2915,11 +3009,35 @@ boolean ga_population_set_stablesize(population *pop, int stable_size)
   last updated: 08 Nov 2002
  **********************************************************************/
 
-boolean ga_population_set_data(population *pop, vpointer data)
+GAULFUNC boolean ga_population_set_data(population *pop, vpointer data)
   {
   if ( !pop ) return FALSE;
 
   pop->data = data;
+
+  return TRUE;
+  }
+
+
+/**********************************************************************
+  ga_population_set_data_managed()
+  synopsis:	Sets the population's user data, along with appropriate
+		user-defined deallocation and copy callback functions.
+  parameters:
+  return:
+  last updated: 29 Jan 2006
+ **********************************************************************/
+
+GAULFUNC boolean ga_population_set_data_managed(population *pop,
+                            vpointer data,
+                            GAdata_destructor population_data_destructor,
+                            GAdata_copy population_data_copy)
+  {
+  if (!pop) return FALSE;
+
+  pop->data = data;
+  pop->population_data_destructor = population_data_destructor;
+  pop->population_data_copy = population_data_copy;
 
   return TRUE;
   }
@@ -2933,7 +3051,7 @@ boolean ga_population_set_data(population *pop, vpointer data)
   last updated: 08 Nov 2002
  **********************************************************************/
 
-vpointer ga_population_get_data(population *pop)
+GAULFUNC vpointer ga_population_get_data(population *pop)
   {
   if ( !pop ) return NULL;
 
@@ -2949,7 +3067,7 @@ vpointer ga_population_get_data(population *pop)
   last updated: 08 Nov 2002
  **********************************************************************/
 
-boolean ga_entity_set_data(population *pop, entity *e, SLList *data)
+GAULFUNC boolean ga_entity_set_data(population *pop, entity *e, SLList *data)
   {
   SLList	*present;		/* Current list element. */
 
@@ -2984,7 +3102,7 @@ boolean ga_entity_set_data(population *pop, entity *e, SLList *data)
   last updated: 08 Nov 2002
  **********************************************************************/
 
-SLList *ga_entity_get_data(population *pop, entity *e)
+GAULFUNC SLList *ga_entity_get_data(population *pop, entity *e)
   {
 
   if ( !pop ) return NULL;
@@ -3003,7 +3121,7 @@ SLList *ga_entity_get_data(population *pop, entity *e)
   last updated: 18 Mar 2003
  **********************************************************************/
 
-int ga_population_get_generation(population *pop)
+GAULFUNC int ga_population_get_generation(population *pop)
   {
 
   if ( !pop ) return 0;
@@ -3021,12 +3139,49 @@ int ga_population_get_generation(population *pop)
   last updated: 28 Feb 2005
  **********************************************************************/
 
-int ga_population_get_island(population *pop)
+GAULFUNC int ga_population_get_island(population *pop)
   {
 
   if ( !pop ) return 0;
 
   return pop->island;
+  }
+
+
+/**********************************************************************
+  ga_population_get_fitness_dimensions()
+  synopsis:	Get number of dimensions in fitness vector, for
+		multiobjective optimisation.
+  parameters:
+  return:
+  last updated: 24 Apr 2005
+ **********************************************************************/
+
+GAULFUNC int ga_population_get_fitness_dimensions(population *pop)
+  {
+
+  if ( !pop ) die("Null pointer to population structure passed.");
+
+  return pop->fitness_dimensions;
+  }
+
+
+/**********************************************************************
+  ga_population_set_fitness_dimensions()
+  synopsis:	Set number of dimensions in fitness vector, for
+		multiobjective optimisation.
+  parameters:
+  return:
+  last updated: 24 Apr 2005
+ **********************************************************************/
+
+GAULFUNC boolean ga_population_set_fitness_dimensions(population *pop, int num)
+  {
+  if ( !pop ) return FALSE;
+
+  pop->fitness_dimensions = num;
+
+  return TRUE;
   }
 
 
@@ -3038,7 +3193,7 @@ int ga_population_get_island(population *pop)
   last updated:	06 Jul 2003
  **********************************************************************/
 
-double ga_population_get_crossover(population	*pop)
+GAULFUNC double ga_population_get_crossover(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3055,7 +3210,7 @@ double ga_population_get_crossover(population	*pop)
   last updated:	16 Feb 2005
  **********************************************************************/
 
-double ga_population_get_allele_mutation_prob(population	*pop)
+GAULFUNC double ga_population_get_allele_mutation_prob(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3072,7 +3227,7 @@ double ga_population_get_allele_mutation_prob(population	*pop)
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_population_get_allele_min_integer(population	*pop)
+GAULFUNC int ga_population_get_allele_min_integer(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3089,7 +3244,7 @@ int ga_population_get_allele_min_integer(population	*pop)
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_population_get_allele_max_integer(population	*pop)
+GAULFUNC int ga_population_get_allele_max_integer(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3107,7 +3262,7 @@ int ga_population_get_allele_max_integer(population	*pop)
   last updated:	17 Feb 2005
  **********************************************************************/
 
-double ga_population_get_allele_min_double(population	*pop)
+GAULFUNC double ga_population_get_allele_min_double(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3125,7 +3280,7 @@ double ga_population_get_allele_min_double(population	*pop)
   last updated:	17 Feb 2005
  **********************************************************************/
 
-double ga_population_get_allele_max_double(population	*pop)
+GAULFUNC double ga_population_get_allele_max_double(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3142,7 +3297,7 @@ double ga_population_get_allele_max_double(population	*pop)
   last updated:	06 Jul 2003
  **********************************************************************/
 
-double ga_population_get_mutation(population	*pop)
+GAULFUNC double ga_population_get_mutation(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3159,7 +3314,7 @@ double ga_population_get_mutation(population	*pop)
   last updated:	06 Jul 2003
  **********************************************************************/
 
-double ga_population_get_migration(population	*pop)
+GAULFUNC double ga_population_get_migration(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3176,7 +3331,7 @@ double ga_population_get_migration(population	*pop)
   last updated:	06 Jul 2003
  **********************************************************************/
 
-ga_scheme_type ga_population_get_scheme(population	*pop)
+GAULFUNC ga_scheme_type ga_population_get_scheme(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3193,7 +3348,7 @@ ga_scheme_type ga_population_get_scheme(population	*pop)
   last updated:	06 Jul 2003
  **********************************************************************/
 
-ga_elitism_type ga_population_get_elitism(population	*pop)
+GAULFUNC ga_elitism_type ga_population_get_elitism(population	*pop)
   {
 
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -3212,10 +3367,10 @@ ga_elitism_type ga_population_get_elitism(population	*pop)
   last updated:	03 May 2004
  **********************************************************************/
 
-void ga_init_openmp( void )
+GAULFUNC void ga_init_openmp( void )
   {
 
-#if USE_OPENMP == 1
+#ifdef USE_OPENMP
 #pragma omp single
     {
     if (gaul_openmp_initialised == FALSE)

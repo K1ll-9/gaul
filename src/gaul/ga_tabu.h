@@ -40,26 +40,26 @@
 /*
  * Prototypes.
  */
-FUNCPROTO boolean ga_tabu_check_integer(  population      *pop,
+GAULFUNC boolean ga_tabu_check_integer(  population      *pop,
                   entity          *putative,
                   entity          *tabu);
-FUNCPROTO boolean ga_tabu_check_boolean(  population      *pop,
+GAULFUNC boolean ga_tabu_check_boolean(  population      *pop,
                   entity          *putative,
                   entity          *tabu);
-FUNCPROTO boolean ga_tabu_check_char(  population      *pop,
+GAULFUNC boolean ga_tabu_check_char(  population      *pop,
                   entity          *putative,
                   entity          *tabu);
-FUNCPROTO boolean ga_tabu_check_double(  population      *pop,
+GAULFUNC boolean ga_tabu_check_double(  population      *pop,
                   entity          *putative,
                   entity          *tabu);
-FUNCPROTO boolean ga_tabu_check_bitstring(  population      *pop,
+GAULFUNC boolean ga_tabu_check_bitstring(  population      *pop,
                   entity          *putative,
                   entity          *tabu);
-FUNCPROTO void ga_population_set_tabu_parameters( population              *pop,
+GAULFUNC void ga_population_set_tabu_parameters( population              *pop,
                       GAtabu_accept           tabu_accept,
                       const int               list_length,
                       const int               search_count);
-FUNCPROTO int ga_tabu(    population              *pop,
+GAULFUNC int ga_tabu(    population              *pop,
 		entity                  *initial,
 	        const int               max_iterations );
 

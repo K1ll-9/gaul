@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_select - Genetic algorithm selection operators.
-  Copyright ©2000-2004, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -35,7 +35,7 @@
 		complete.
 
 		On the first call to these routines in a given
-		generation, pop->select_state is gauranteed to be set
+		generation, pop->select_state is guaranteed to be set
 		to zero.  These routines are then free to modify this
 		value, for example, to store the number of selections
 		performed in this generation.
@@ -59,9 +59,6 @@
 		between calls to these functions!  (Although, of course,
 		you are free to use whichever value you like in
 		user-defined functions.)
-
-  To do:	Reimplement stochastic universal selection etc. using this callback mechanism.
-		Reimplement probability ranges: mutation_prob = mutation_max - (mutation_max-mutation_min)*i/pop->orig_size;
 
  **********************************************************************/
 
@@ -158,7 +155,7 @@ static double gaul_select_sum_sq_fitness( population *pop )
   last updated: 30/04/01
  **********************************************************************/
 
-boolean ga_select_one_random(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_random(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -186,7 +183,7 @@ boolean ga_select_one_random(population *pop, entity **mother)
   last updated: 30/04/01
  **********************************************************************/
 
-boolean ga_select_two_random(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_random(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -218,7 +215,7 @@ boolean ga_select_two_random(population *pop, entity **mother, entity **father)
   last updated: 23/04/01
  **********************************************************************/
 
-boolean ga_select_one_every(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_every(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -246,7 +243,7 @@ boolean ga_select_one_every(population *pop, entity **mother)
   last updated: 23/04/01
  **********************************************************************/
 
-boolean ga_select_two_every(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_every(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -276,7 +273,7 @@ boolean ga_select_two_every(population *pop, entity **mother, entity **father)
   last updated: 23/04/01
  **********************************************************************/
 
-boolean ga_select_one_randomrank(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_randomrank(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -309,7 +306,7 @@ boolean ga_select_one_randomrank(population *pop, entity **mother)
   last updated: 23/04/01
  **********************************************************************/
 
-boolean ga_select_two_randomrank(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_randomrank(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -345,7 +342,7 @@ boolean ga_select_two_randomrank(population *pop, entity **mother, entity **fath
   last updated: 25 May 2004
  **********************************************************************/
 
-boolean ga_select_one_bestof3(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_bestof3(population *pop, entity **mother)
   {
   entity	*mother2, *mother3;	/* Random competitors. */
 
@@ -385,7 +382,7 @@ boolean ga_select_one_bestof3(population *pop, entity **mother)
   last updated: 25 May 2004
  **********************************************************************/
 
-boolean ga_select_two_bestof3(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_bestof3(population *pop, entity **mother, entity **father)
   {
   entity	*challenger1, *challenger2;	/* Random competitors. */
 
@@ -438,7 +435,7 @@ boolean ga_select_two_bestof3(population *pop, entity **mother, entity **father)
   last updated: 30/04/01
  **********************************************************************/
 
-boolean ga_select_one_bestof2(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_bestof2(population *pop, entity **mother)
   {
   entity	*mother2;	/* Random competitor. */
 
@@ -474,7 +471,7 @@ boolean ga_select_one_bestof2(population *pop, entity **mother)
   last updated: 25 May 2004
  **********************************************************************/
 
-boolean ga_select_two_bestof2(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_bestof2(population *pop, entity **mother, entity **father)
   {
   entity	*challenger;	/* Random competitor. */
 
@@ -523,7 +520,7 @@ boolean ga_select_two_bestof2(population *pop, entity **mother, entity **father)
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_one_roulette(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_roulette(population *pop, entity **mother)
   {
   double	selectval;		/* Select when this reaches zero. */
 
@@ -531,7 +528,8 @@ boolean ga_select_one_roulette(population *pop, entity **mother)
 
   *mother = NULL;
 
-  if (pop->orig_size < 1)
+  if (pop->orig_size < 1 ||
+	  pop->select_state+1 > (pop->orig_size * pop->mutation_ratio))
     {
     return TRUE;
     }
@@ -560,7 +558,7 @@ boolean ga_select_one_roulette(population *pop, entity **mother)
 
   *mother = pop->entity_iarray[pop->selectdata.marker];
 
-  return pop->select_state>(pop->orig_size*pop->mutation_ratio);
+  return FALSE;
   }
 
 
@@ -579,7 +577,7 @@ boolean ga_select_one_roulette(population *pop, entity **mother)
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_one_roulette_rebased(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_roulette_rebased(population *pop, entity **mother)
   {
   double	selectval;		/* Select when this reaches zero. */
 
@@ -587,7 +585,8 @@ boolean ga_select_one_roulette_rebased(population *pop, entity **mother)
 
   *mother = NULL;
 
-  if (pop->orig_size < 1)
+  if (pop->orig_size < 1 ||
+	  pop->select_state+1 > (pop->orig_size * pop->mutation_ratio))
     {
     return TRUE;
     }
@@ -619,7 +618,7 @@ boolean ga_select_one_roulette_rebased(population *pop, entity **mother)
 
   *mother = pop->entity_iarray[pop->selectdata.marker];
 
-  return pop->select_state>(pop->orig_size*pop->mutation_ratio);
+  return FALSE;
   }
 
 
@@ -632,13 +631,13 @@ boolean ga_select_one_roulette_rebased(population *pop, entity **mother)
 		This version is for fitness values where 0.0 is bad and
 		large positive values are good.  Negative values will
 		severely mess-up the algorithm.
-                Mother and father may be the same.
+        Mother and father may be the same.
   parameters:
   return:	
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_two_roulette( population *pop,
+GAULFUNC boolean ga_select_two_roulette( population *pop,
                                 entity **mother, entity **father )
   {
   double	selectval;		/* Select when this reaches zero. */
@@ -648,7 +647,8 @@ boolean ga_select_two_roulette( population *pop,
   *mother = NULL;
   *father = NULL;
 
-  if (pop->orig_size < 1)
+  if (pop->orig_size < 1 ||
+	  pop->select_state+1 > (pop->orig_size * pop->mutation_ratio))
     {
     return TRUE;
     }
@@ -695,7 +695,7 @@ printf("Mean fitness = %f stddev = %f sum = %f expval = %f\n", mean, stddev, sum
 
   *father = pop->entity_iarray[pop->selectdata.marker];
 
-  return pop->select_state>(pop->orig_size*pop->crossover_ratio);
+  return FALSE;
   }
 
 
@@ -709,13 +709,13 @@ printf("Mean fitness = %f stddev = %f sum = %f expval = %f\n", mean, stddev, sum
 		negative fitness scores.  The single least fit entity
 		will never be selected, but this is not considered a
 		problem.
-                Mother and father may be the same.
+        Mother and father may be the same.
   parameters:
   return:	
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_two_roulette_rebased( population *pop,
+GAULFUNC boolean ga_select_two_roulette_rebased( population *pop,
                                         entity **mother, entity **father )
   {
   double	selectval;		/* Select when this reaches zero. */
@@ -724,7 +724,8 @@ boolean ga_select_two_roulette_rebased( population *pop,
 
   *mother = NULL;
 
-  if (pop->orig_size < 1)
+  if (pop->orig_size < 1 ||
+	  pop->select_state+1 > (pop->orig_size * pop->mutation_ratio))
     {
     return TRUE;
     }
@@ -771,7 +772,7 @@ boolean ga_select_two_roulette_rebased( population *pop,
 
   *father = pop->entity_iarray[pop->selectdata.marker];
 
-  return pop->select_state>(pop->orig_size*pop->crossover_ratio);
+  return FALSE;
   }
 
 
@@ -788,7 +789,7 @@ boolean ga_select_two_roulette_rebased( population *pop,
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_one_sus(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_sus(population *pop, entity **mother)
   {
   double	sum;			/* Fitness total. */
 
@@ -803,7 +804,7 @@ boolean ga_select_one_sus(population *pop, entity **mother)
 
   if (pop->select_state == 0)
     { /* First call of this generation. */
-    pop->selectdata.num_to_select = (pop->orig_size*pop->mutation_ratio);
+    pop->selectdata.num_to_select = max(1,(int)floor(pop->orig_size*pop->mutation_ratio));
     sum = gaul_select_sum_fitness(pop);
     pop->selectdata.step = sum/(pop->orig_size*pop->mutation_ratio);
     pop->selectdata.offset1 = random_double(pop->selectdata.step);
@@ -847,7 +848,7 @@ boolean ga_select_one_sus(population *pop, entity **mother)
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_two_sus(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_sus(population *pop, entity **mother, entity **father)
   {
   double	sum;			/* Fitness total. */
   int		*ordered;		/* Ordered indices. */
@@ -864,7 +865,7 @@ boolean ga_select_two_sus(population *pop, entity **mother, entity **father)
 
   if (pop->select_state == 0)
     { /* First call of this generation. */
-    pop->selectdata.num_to_select = (pop->orig_size*pop->crossover_ratio);
+    pop->selectdata.num_to_select = max(1,(int)floor(pop->orig_size*pop->crossover_ratio));
     sum = gaul_select_sum_fitness(pop);
     pop->selectdata.step = sum/pop->selectdata.num_to_select;
     pop->selectdata.offset1 = pop->selectdata.offset2 = random_double(pop->selectdata.step);
@@ -872,13 +873,10 @@ boolean ga_select_two_sus(population *pop, entity **mother, entity **father)
     pop->selectdata.current2=0;
     pop->selectdata.permutation=NULL;
 
-/*
-    if (pop->selectdata.permutation!=NULL)
-      die("Internal error.  Permutation buffer not NULL.");
-*/
-
-    pop->selectdata.permutation = s_malloc(sizeof(int)*pop->orig_size);
-    ordered = s_malloc(sizeof(int)*pop->orig_size);
+    if ( !(pop->selectdata.permutation = s_malloc(sizeof(int)*pop->orig_size)) )
+      die("Unable to allocate memory");
+    if ( !(ordered = s_malloc(sizeof(int)*pop->orig_size)) )
+      die("Unable to allocate memory");
     for (i=0; i<pop->orig_size;i++)
       ordered[i]=i;
     random_int_permutation(pop->orig_size, ordered, pop->selectdata.permutation);
@@ -933,7 +931,7 @@ boolean ga_select_two_sus(population *pop, entity **mother, entity **father)
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_one_sussq(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_sussq(population *pop, entity **mother)
   {
   double	sum;			/* Fitness total. */
 
@@ -948,7 +946,7 @@ boolean ga_select_one_sussq(population *pop, entity **mother)
 
   if (pop->select_state == 0)
     { /* First call of this generation. */
-    pop->selectdata.num_to_select = (pop->orig_size*pop->mutation_ratio);
+    pop->selectdata.num_to_select = max(1,(int)floor(pop->orig_size*pop->mutation_ratio));
     sum = gaul_select_sum_sq_fitness(pop);
     pop->selectdata.step = sum/(pop->orig_size*pop->mutation_ratio);
     pop->selectdata.offset1 = random_double(pop->selectdata.step);
@@ -991,7 +989,7 @@ boolean ga_select_one_sussq(population *pop, entity **mother)
   last updated: 28 Jun 2004
  **********************************************************************/
 
-boolean ga_select_two_sussq(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_sussq(population *pop, entity **mother, entity **father)
   {
   double	sum;			/* Fitness total. */
   int		*ordered;		/* Ordered indices. */
@@ -1008,7 +1006,7 @@ boolean ga_select_two_sussq(population *pop, entity **mother, entity **father)
 
   if (pop->select_state == 0)
     { /* First call of this generation. */
-    pop->selectdata.num_to_select = (pop->orig_size*pop->crossover_ratio);
+    pop->selectdata.num_to_select = max(1,(int)floor(pop->orig_size*pop->crossover_ratio));
     sum = gaul_select_sum_sq_fitness(pop);
     pop->selectdata.step = sum/pop->selectdata.num_to_select;
     pop->selectdata.offset1 = pop->selectdata.offset2 = random_double(pop->selectdata.step);
@@ -1021,8 +1019,10 @@ boolean ga_select_two_sussq(population *pop, entity **mother, entity **father)
       die("Internal error.  Permutation buffer not NULL.");
 */
 
-    pop->selectdata.permutation = s_malloc(sizeof(int)*pop->orig_size);
-    ordered = s_malloc(sizeof(int)*pop->orig_size);
+    if ( !(pop->selectdata.permutation = s_malloc(sizeof(int)*pop->orig_size)) )
+      die("Unable to allocate memory");
+    if ( !(ordered = s_malloc(sizeof(int)*pop->orig_size)) )
+      die("Unable to allocate memory");
     for (i=0; i<pop->orig_size;i++)
       ordered[i]=i;
     random_int_permutation(pop->orig_size, ordered, pop->selectdata.permutation);
@@ -1072,7 +1072,7 @@ boolean ga_select_two_sussq(population *pop, entity **mother, entity **father)
   last updated: 18 Apr 2003
  **********************************************************************/
 
-boolean ga_select_one_aggressive(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_aggressive(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1094,7 +1094,7 @@ boolean ga_select_one_aggressive(population *pop, entity **mother)
   last updated: 18 Apr 2003
  **********************************************************************/
 
-boolean ga_select_two_aggressive(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_aggressive(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1116,7 +1116,7 @@ boolean ga_select_two_aggressive(population *pop, entity **mother, entity **fath
   last updated: 18 Apr 2003
  **********************************************************************/
 
-boolean ga_select_one_best(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_best(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1138,7 +1138,7 @@ boolean ga_select_one_best(population *pop, entity **mother)
   last updated: 18 Apr 2003
  **********************************************************************/
 
-boolean ga_select_two_best(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_best(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1161,7 +1161,7 @@ boolean ga_select_two_best(population *pop, entity **mother, entity **father)
   last updated: 19 Mar 2004
  **********************************************************************/
 
-boolean ga_select_one_linearrank(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_linearrank(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1183,7 +1183,7 @@ boolean ga_select_one_linearrank(population *pop, entity **mother)
   last updated: 19 Mar 2004
  **********************************************************************/
 
-boolean ga_select_two_linearrank(population *pop, entity **mother, entity **father)
+GAULFUNC boolean ga_select_two_linearrank(population *pop, entity **mother, entity **father)
   {
 
   if (!pop) die("Null pointer to population structure passed.");
@@ -1208,7 +1208,7 @@ boolean ga_select_two_linearrank(population *pop, entity **mother, entity **fath
   last updated: 23 Aug 2004
  **********************************************************************/
 
-boolean ga_select_one_roundrobin(population *pop, entity **mother)
+GAULFUNC boolean ga_select_one_roundrobin(population *pop, entity **mother)
   {
 
   if (!pop) die("Null pointer to population structure passed.");

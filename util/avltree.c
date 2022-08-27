@@ -3,7 +3,7 @@
  **********************************************************************
 
   avltree - AVL tree implementation.
-  Copyright ©2000-2004, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -126,7 +126,7 @@ static AVLNode		*node_free_list = NULL;
  * less coarse locks might be better.
  */
 THREAD_LOCK_DEFINE_STATIC(avltree_node_buffer_lock);
-#if USE_OPENMP == 1
+#ifdef USE_OPENMP
 static boolean avltree_openmp_initialised = FALSE;
 #endif
 
@@ -190,7 +190,8 @@ static AVLNode *avltree_node_new(AVLKey key, vpointer data)
         node_buffers = s_realloc(node_buffers, sizeof(AVLNode *)*num_buffers);
         }
 
-      node_buffers[buffer_num] = s_malloc(sizeof(AVLNode)*AVL_NODE_BUFFER_SIZE);
+      if ( !(node_buffers[buffer_num] = s_malloc(sizeof(AVLNode)*AVL_NODE_BUFFER_SIZE)) )
+        die("Unable to allocate memory");
 
       node = node_buffers[buffer_num];
       num_used = 1;
@@ -720,10 +721,10 @@ static void avltree_node_check(AVLNode *node)
  * code is to be used.  Can be safely called when OpenMP code is not
  * being used, and can be safely called more than once.
  */
-void avltree_init_openmp(void)
+GAULFUNC void avltree_init_openmp(void)
   {
 
-#if USE_OPENMP == 1
+#ifdef USE_OPENMP
   if (avltree_openmp_initialised == FALSE)
     {
     omp_init_lock(&avltree_node_buffer_lock);
@@ -735,7 +736,7 @@ void avltree_init_openmp(void)
   }
 
 
-AVLTree *avltree_new(AVLKeyFunc key_generate_func)
+GAULFUNC AVLTree *avltree_new(AVLKeyFunc key_generate_func)
   {
   AVLTree *tree;
 
@@ -753,7 +754,7 @@ AVLTree *avltree_new(AVLKeyFunc key_generate_func)
   }
 
 
-void avltree_delete(AVLTree *tree)
+GAULFUNC void avltree_delete(AVLTree *tree)
   {
   if (!tree) return;
 
@@ -772,7 +773,7 @@ void avltree_delete(AVLTree *tree)
   }
 
 
-void avltree_destroy(AVLTree *tree, AVLDestructorFunc free_func)
+GAULFUNC void avltree_destroy(AVLTree *tree, AVLDestructorFunc free_func)
   {
   if (!tree) return;
 
@@ -794,7 +795,7 @@ void avltree_destroy(AVLTree *tree, AVLDestructorFunc free_func)
   }
 
 
-boolean avltree_insert(AVLTree *tree, vpointer data)
+GAULFUNC boolean avltree_insert(AVLTree *tree, vpointer data)
   {
   boolean	inserted=FALSE;
 
@@ -808,7 +809,7 @@ boolean avltree_insert(AVLTree *tree, vpointer data)
   }
 
 
-vpointer avltree_remove(AVLTree *tree, vpointer data)
+GAULFUNC vpointer avltree_remove(AVLTree *tree, vpointer data)
   {
   vpointer removed=NULL;
 
@@ -820,7 +821,7 @@ vpointer avltree_remove(AVLTree *tree, vpointer data)
   }
 
 
-vpointer avltree_remove_key(AVLTree *tree, AVLKey key)
+GAULFUNC vpointer avltree_remove_key(AVLTree *tree, AVLKey key)
   {
   vpointer removed=NULL;
 
@@ -832,7 +833,7 @@ vpointer avltree_remove_key(AVLTree *tree, AVLKey key)
   }
 
 
-vpointer avltree_lookup(AVLTree *tree, vpointer data)
+GAULFUNC vpointer avltree_lookup(AVLTree *tree, vpointer data)
   {
   AVLNode	*node;
 
@@ -843,7 +844,7 @@ vpointer avltree_lookup(AVLTree *tree, vpointer data)
   }
 
 
-vpointer avltree_lookup_key(AVLTree *tree, AVLKey key)
+GAULFUNC vpointer avltree_lookup_key(AVLTree *tree, AVLKey key)
   {
   AVLNode	*node;
 
@@ -854,7 +855,7 @@ vpointer avltree_lookup_key(AVLTree *tree, AVLKey key)
   }
 
 
-vpointer avltree_lookup_lowest(AVLTree *tree)
+GAULFUNC vpointer avltree_lookup_lowest(AVLTree *tree)
   {
   AVLNode	*node;
 
@@ -865,7 +866,7 @@ vpointer avltree_lookup_lowest(AVLTree *tree)
   }
 
 
-vpointer avltree_lookup_highest(AVLTree *tree)
+GAULFUNC vpointer avltree_lookup_highest(AVLTree *tree)
   {
   AVLNode	*node;
 
@@ -876,7 +877,7 @@ vpointer avltree_lookup_highest(AVLTree *tree)
   }
 
 
-vpointer avltree_ordered_search(AVLTree *tree,
+GAULFUNC vpointer avltree_ordered_search(AVLTree *tree,
                     AVLSearchFunc search_func, vpointer userdata)
   {
   if (!tree || !tree->root) return NULL;
@@ -885,7 +886,7 @@ vpointer avltree_ordered_search(AVLTree *tree,
   }
 
 
-vpointer avltree_search(AVLTree *tree, AVLMatchFunc search_func, vpointer userdata)
+GAULFUNC vpointer avltree_search(AVLTree *tree, AVLMatchFunc search_func, vpointer userdata)
   {
   vpointer	nodedata=NULL;
 
@@ -895,7 +896,7 @@ vpointer avltree_search(AVLTree *tree, AVLMatchFunc search_func, vpointer userda
   }
 
 
-void avltree_traverse(AVLTree *tree, AVLTraverseFunc traverse_func, vpointer userdata)
+GAULFUNC void avltree_traverse(AVLTree *tree, AVLTraverseFunc traverse_func, vpointer userdata)
   {
   if (!tree || !tree->root) return;
 
@@ -905,13 +906,13 @@ void avltree_traverse(AVLTree *tree, AVLTraverseFunc traverse_func, vpointer use
   }
 
 
-int avltree_height(AVLTree *tree)
+GAULFUNC int avltree_height(AVLTree *tree)
   {
   return (tree!=NULL && tree->root!=NULL)?avltree_node_height(tree->root):0;
   }
 
 
-int avltree_num_nodes(AVLTree *tree)
+GAULFUNC int avltree_num_nodes(AVLTree *tree)
   {
   return (tree!=NULL && tree->root!=NULL)?avltree_node_count(tree->root):0;
   }
@@ -921,7 +922,7 @@ int avltree_num_nodes(AVLTree *tree)
  * Testing:
  */
 
-void avltree_diagnostics(void)
+GAULFUNC void avltree_diagnostics(void)
   {
   printf("=== AVLTree diagnostics ======================================\n");
   printf("Version:                   %s\n", GA_VERSION_STRING);
@@ -982,7 +983,7 @@ static boolean test_avltree_traverse(AVLKey key, vpointer data, vpointer userdat
 #ifdef AVLTREE_COMPILE_MAIN
 int main(int argc, char **argv)
 #else
-boolean avltree_test(void)
+GAULFUNC boolean avltree_test(void)
 #endif
   {
   int		i, j;

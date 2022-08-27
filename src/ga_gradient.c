@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_gradient - Gradient methods for comparison and local search.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -56,7 +56,7 @@
   last updated: 19 Nov 2002
  **********************************************************************/
 
-void ga_population_set_gradient_parameters( population		*pop,
+GAULFUNC void ga_population_set_gradient_parameters( population		*pop,
                                         const GAto_double	to_double,
                                         const GAfrom_double	from_double,
                                         const GAgradient	gradient,
@@ -73,7 +73,10 @@ void ga_population_set_gradient_parameters( population		*pop,
   plog( LOG_VERBOSE, "Population's gradient methods parameters set" );
 
   if (pop->gradient_params == NULL)
-    pop->gradient_params = s_malloc(sizeof(ga_gradient_t));
+    {
+    if ( !(pop->gradient_params = s_malloc(sizeof(ga_gradient_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->gradient_params->to_double = to_double;
   pop->gradient_params->from_double = from_double;
@@ -103,7 +106,7 @@ void ga_population_set_gradient_parameters( population		*pop,
   last updated:	18 Feb 2005
  **********************************************************************/
 
-int ga_steepestascent(	population	*pop,
+GAULFUNC int ga_steepestascent(	population	*pop,
 			entity		*current,
 			const int	max_iterations )
   {
@@ -133,7 +136,8 @@ int ga_steepestascent(	population	*pop,
 /* 
  * Prepare working entity and double arrays.
  */
-  buffer = s_malloc(sizeof(double)*pop->gradient_params->dimensions*3);
+  if ( !(buffer = s_malloc(sizeof(double)*pop->gradient_params->dimensions*3)) )
+    die("Unable to allocate memory");
 
   current_d = buffer;
   putative_d = &(buffer[pop->gradient_params->dimensions]);
@@ -279,7 +283,7 @@ int ga_steepestascent(	population	*pop,
   last updated:	14 Apr 2005
  **********************************************************************/
 
-int ga_steepestascent_double(	population	*pop,
+GAULFUNC int ga_steepestascent_double(	population	*pop,
 			entity		*current,
 			const int	max_iterations )
   {
@@ -303,7 +307,8 @@ int ga_steepestascent_double(	population	*pop,
 /* 
  * Prepare working entity and gradient array.
  */
-  current_g = s_malloc(sizeof(double)*pop->len_chromosomes);
+  if ( !(current_g = s_malloc(sizeof(double)*pop->len_chromosomes)) )
+    die("Unable to allocate memory");
 
   putative = ga_get_free_entity(pop);
 

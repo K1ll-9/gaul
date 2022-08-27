@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_simplex - A simplex search algorithm for comparison and local search.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -62,7 +62,7 @@
   last updated: 29 Mar 2004
  **********************************************************************/
 
-void ga_population_set_simplex_parameters( population		*pop,
+GAULFUNC void ga_population_set_simplex_parameters( population		*pop,
 					const int		dimensions,
 					const double		step,
                                         const GAto_double	to_double,
@@ -78,7 +78,10 @@ void ga_population_set_simplex_parameters( population		*pop,
   plog( LOG_VERBOSE, "Population's simplex-search parameters set" );
 
   if (pop->simplex_params == NULL)
-    pop->simplex_params = s_malloc(sizeof(ga_simplex_t));
+    {
+    if ( !(pop->simplex_params = s_malloc(sizeof(ga_simplex_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->simplex_params->to_double = to_double;
   pop->simplex_params->from_double = from_double;
@@ -101,7 +104,7 @@ void ga_population_set_simplex_parameters( population		*pop,
 		are performed using the standard and evaluation
 		callback mechanism.
 		The passed entity will have its data overwritten.  The
-		remainder of the population will be let untouched.
+		remainder of the population will be left untouched.
 		Note that it is safe to pass a NULL initial structure,
 		in which case a random starting structure will be
 		generated, however the final solution will not be
@@ -111,7 +114,7 @@ void ga_population_set_simplex_parameters( population		*pop,
   last updated:	18 Feb 2005
  **********************************************************************/
 
-int ga_simplex(	population		*pop,
+GAULFUNC int ga_simplex(	population		*pop,
 		entity			*initial,
 		const int		max_iterations )
   {
@@ -144,9 +147,12 @@ int ga_simplex(	population		*pop,
  * The space for the average and new arrays are allocated simultaneously.
  */
   num_points = pop->simplex_params->dimensions+1;
-  putative = s_malloc(sizeof(entity *)*num_points);
-  putative_d = s_malloc(sizeof(double *)*num_points);
-  putative_d_buffer = s_malloc(sizeof(double)*pop->simplex_params->dimensions*num_points*3);
+  if ( !(putative = s_malloc(sizeof(entity *)*num_points)) )
+    die("Unable to allocate memory");
+  if ( !(putative_d = s_malloc(sizeof(double *)*num_points)) )
+    die("Unable to allocate memory");
+  if ( !(putative_d_buffer = s_malloc(sizeof(double)*pop->simplex_params->dimensions*num_points*3)) )
+    die("Unable to allocate memory");
 
   putative_d[0] = putative_d_buffer;
   average = &(putative_d_buffer[num_points*pop->simplex_params->dimensions]);
@@ -566,7 +572,7 @@ int ga_simplex(	population		*pop,
 		are performed using the standard and evaluation
 		callback mechanism.
 		The passed entity will have its data overwritten.  The
-		remainder of the population will be let untouched.
+		remainder of the population will be left untouched.
 		Note that it is safe to pass a NULL initial structure,
 		in which case a random starting structure will be
 		generated, however the final solution will not be
@@ -579,7 +585,7 @@ int ga_simplex(	population		*pop,
   last updated:	13 Apr 2005
  **********************************************************************/
 
-int ga_simplex_double(	population		*pop,
+GAULFUNC int ga_simplex_double(	population		*pop,
 		entity			*initial,
 		const int		max_iterations )
   {
@@ -607,8 +613,10 @@ int ga_simplex_double(	population		*pop,
  * The space for the average and new arrays are allocated simultaneously.
  */
   num_points = pop->len_chromosomes+1;
-  putative = s_malloc(sizeof(entity *)*num_points);
-  average = s_malloc(sizeof(double)*pop->len_chromosomes);
+  if ( !(putative = s_malloc(sizeof(entity *)*num_points)) )
+    die("Unable to allocate memory");
+  if ( !(average = s_malloc(sizeof(double)*pop->len_chromosomes)) )
+    die("Unable to allocate memory");
 
   for (i=1; i<num_points; i++)
     {
@@ -975,7 +983,11 @@ int ga_simplex_double(	population		*pop,
     ga_entity_dereference(pop, putative[i]);
     }
 
+  /*
+   * Clean-up.
+   */
   s_free(putative);
+  s_free(average);
 
   return iteration;
   }

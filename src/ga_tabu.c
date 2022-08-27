@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_tabu - A tabu-search algorithm for comparison and local search.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -44,7 +44,7 @@
   last updated: 10 Oct 2002
  **********************************************************************/
 
-boolean ga_tabu_check_integer(	population	*pop,
+GAULFUNC boolean ga_tabu_check_integer(	population	*pop,
 				entity		*putative,
 				entity		*tabu)
   {
@@ -79,7 +79,7 @@ boolean ga_tabu_check_integer(	population	*pop,
   last updated: 14 Oct 2002
  **********************************************************************/
 
-boolean ga_tabu_check_char(	population	*pop,
+GAULFUNC boolean ga_tabu_check_char(	population	*pop,
 				entity		*putative,
 				entity		*tabu)
   {
@@ -114,7 +114,7 @@ boolean ga_tabu_check_char(	population	*pop,
   last updated: 14 Oct 2002
  **********************************************************************/
 
-boolean ga_tabu_check_boolean(	population	*pop,
+GAULFUNC boolean ga_tabu_check_boolean(	population	*pop,
 				entity		*putative,
 				entity		*tabu)
   {
@@ -149,7 +149,7 @@ boolean ga_tabu_check_boolean(	population	*pop,
   last updated: 14 Oct 2002
  **********************************************************************/
 
-boolean ga_tabu_check_double(	population	*pop,
+GAULFUNC boolean ga_tabu_check_double(	population	*pop,
 				entity		*putative,
 				entity		*tabu)
   {
@@ -184,13 +184,13 @@ boolean ga_tabu_check_double(	population	*pop,
   last updated: 14 Oct 2002
  **********************************************************************/
 
-boolean ga_tabu_check_bitstring( population	*pop,
+GAULFUNC boolean ga_tabu_check_bitstring( population	*pop,
 				entity		*putative,
 				entity		*tabu)
   {
   int		i;		/* Loop variable over chromosomes. */
   int		j;		/* Loop variable over alleles. */
-  byte		*a, *b;         /* Comparison bitstrings. */
+  gaulbyte		*a, *b;         /* Comparison bitstrings. */
 
   /* Checks. */
   if ( !pop ) die("Null pointer to population structure passed.");
@@ -198,8 +198,8 @@ boolean ga_tabu_check_bitstring( population	*pop,
 
   for (i=0; i<pop->num_chromosomes; i++)
     {
-    a = (byte*)(putative->chromosome[i]);
-    b = (byte*)(tabu->chromosome[i]);
+    a = (gaulbyte*)(putative->chromosome[i]);
+    b = (gaulbyte*)(tabu->chromosome[i]);
 
     for (j=0; j<pop->len_chromosomes; j++)
       if (ga_bit_get( a, i ) != ga_bit_get( b, i )) return FALSE;
@@ -253,7 +253,7 @@ static int gaul_check_tabu_list(	population	*pop,
   last updated: 09 Oct 2002
  **********************************************************************/
 
-void ga_population_set_tabu_parameters( population              *pop,
+GAULFUNC void ga_population_set_tabu_parameters( population              *pop,
 		                        GAtabu_accept           tabu_accept,
                                         const int               list_length,
                                         const int               search_count)
@@ -267,7 +267,10 @@ void ga_population_set_tabu_parameters( population              *pop,
         list_length, search_count );
 
   if (pop->tabu_params == NULL)
-    pop->tabu_params = s_malloc(sizeof(ga_tabu_t));
+    {
+    if ( !(pop->tabu_params = s_malloc(sizeof(ga_tabu_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->tabu_params->tabu_accept = tabu_accept;
   pop->tabu_params->list_length = list_length;
@@ -294,7 +297,7 @@ void ga_population_set_tabu_parameters( population              *pop,
   last updated:	18 Feb 2005
  **********************************************************************/
 
-int ga_tabu(	population		*pop,
+GAULFUNC int ga_tabu(	population		*pop,
 		entity			*initial,
 		const int		max_iterations )
   {
@@ -316,7 +319,8 @@ int ga_tabu(	population		*pop,
 
 /* Prepare working entities. */
   best = ga_get_free_entity(pop);	/* The best solution so far. */
-  putative = s_malloc(sizeof(entity *)*pop->tabu_params->search_count);
+  if ( !(putative = s_malloc(sizeof(entity *)*pop->tabu_params->search_count)) )
+    die("Unable to allocate memory");
 
   for (i=0; i<pop->tabu_params->search_count; i++)
     {
@@ -324,7 +328,8 @@ int ga_tabu(	population		*pop,
     }
 
 /* Allocate and clear an array for the tabu list. */
-  tabu_list = s_malloc(sizeof(vpointer)*pop->tabu_params->list_length);
+  if ( !(tabu_list = s_malloc(sizeof(vpointer)*pop->tabu_params->list_length)) )
+    die("Unable to allocate memory");
 
   for (i=0; i<pop->tabu_params->list_length; i++)
     {

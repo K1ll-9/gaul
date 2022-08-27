@@ -3,7 +3,7 @@
  **********************************************************************
 
   test_simplex - Test program for GAUL.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -34,6 +34,53 @@
 
 #include "gaul.h"
 
+/**********************************************************************
+  test_to_double()
+  synopsis:     Convert to double array.
+  parameters:
+  return:
+  last updated: 25 Nov 2002
+ **********************************************************************/
+
+static boolean test_to_double(population *pop, entity *this_entity, double *array)
+  {
+
+  if (!pop) die("Null pointer to population structure passed.");
+  if (!this_entity) die("Null pointer to entity structure passed.");
+
+  array[0] = ((double *)this_entity->chromosome[0])[0];
+  array[1] = ((double *)this_entity->chromosome[0])[1];
+  array[2] = ((double *)this_entity->chromosome[0])[2];
+  array[3] = ((double *)this_entity->chromosome[0])[3];
+
+  return TRUE;
+  }
+
+
+/**********************************************************************
+  test_from_double()
+  synopsis:     Convert from double array.
+  parameters:
+  return:
+  last updated: 25 Nov 2002
+ **********************************************************************/
+
+static boolean test_from_double(population *pop, entity *this_entity, double *array)
+  {
+
+  if (!pop) die("Null pointer to population structure passed.");
+  if (!this_entity) die("Null pointer to entity structure passed.");
+
+  if (!this_entity->chromosome) die("Entity has no chromsomes.");
+
+  ((double *)this_entity->chromosome[0])[0] = array[0];
+  ((double *)this_entity->chromosome[0])[1] = array[1];
+  ((double *)this_entity->chromosome[0])[2] = array[2];
+  ((double *)this_entity->chromosome[0])[3] = array[3];
+
+  return TRUE;
+  }
+
 
 /**********************************************************************
   test_score()
@@ -43,16 +90,16 @@
   updated:	25 Nov 2002
  **********************************************************************/
 
-boolean test_score(population *pop, entity *entity)
+static boolean test_score(population *pop, entity *this_entity)
   {
   double		A, B, C, D;	/* Parameters. */
 
-  A = ((double *)entity->chromosome[0])[0];
-  B = ((double *)entity->chromosome[0])[1];
-  C = ((double *)entity->chromosome[0])[2];
-  D = ((double *)entity->chromosome[0])[3];
+  A = ((double *)this_entity->chromosome[0])[0];
+  B = ((double *)this_entity->chromosome[0])[1];
+  C = ((double *)this_entity->chromosome[0])[2];
+  D = ((double *)this_entity->chromosome[0])[3];
 
-  entity->fitness = -(fabs(0.75-A)+SQU(0.95-B)+fabs(CUBE(0.23-C))+FOURTH_POW(0.71-D));
+  this_entity->fitness = -(fabs(0.75-A)+SQU(0.95-B)+fabs(CUBE(0.23-C))+FOURTH_POW(0.71-D));
 
   return TRUE;
   }
@@ -66,7 +113,7 @@ boolean test_score(population *pop, entity *entity)
   updated:	25 Nov 2002
  **********************************************************************/
 
-boolean test_iteration_callback(int iteration, entity *solution)
+static boolean test_iteration_callback(int iteration, entity *solution)
   {
 
   printf( "%d: A = %f B = %f C = %f D = %f (fitness = %f)\n",
@@ -90,7 +137,7 @@ boolean test_iteration_callback(int iteration, entity *solution)
   last updated: 25 Nov 2002
  **********************************************************************/
 
-boolean test_seed(population *pop, entity *adam)
+static boolean test_seed(population *pop, entity *adam)
   {
 
 /* Checks. */
@@ -112,7 +159,7 @@ boolean test_seed(population *pop, entity *adam)
   synopsis:	Main function.
   parameters:
   return:
-  updated:	13 Apr 2005
+  updated:	25 Nov 2002
  **********************************************************************/
 
 int main(int argc, char **argv)
@@ -142,11 +189,11 @@ int main(int argc, char **argv)
             );
 
   ga_population_set_simplex_parameters(
-       pop,			/* population		*pop */
-       0,			/* const int		num_dimensions */
-       0.5,			/* const double         Initial step size. */
-       NULL,			/* const GAto_double	to_double */
-       NULL			/* const GAfrom_double	from_double */
+       pop,				/* population		*pop */
+       4,				/* const int		num_dimensions */
+       0.5,				/* const double         Initial step size. */
+       test_to_double,			/* const GAto_double	to_double */
+       test_from_double			/* const GAfrom_double	from_double */
        );
 
   /* Evaluate and sort the initial population members (i.e. select best of 50 random solutions. */
@@ -155,7 +202,7 @@ int main(int argc, char **argv)
   /* Use the best population member. */
   solution = ga_get_entity_from_rank(pop, 0);
 
-  ga_simplex_double(
+  ga_simplex(
        pop,				/* population		*pop */
        solution,			/* entity		*solution */
        10000				/* const int		max_iterations */

@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_climbing - Hill climbing algorithms for comparison and search.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -44,7 +44,7 @@
   last updated: 17 Oct 2002
  **********************************************************************/
 
-void ga_population_set_hillclimbing_parameters( population              *pop,
+GAULFUNC void ga_population_set_hillclimbing_parameters( population              *pop,
                                       GAmutate_allele		mutate_allele)
   {
 
@@ -55,7 +55,10 @@ void ga_population_set_hillclimbing_parameters( population              *pop,
         "Population's hill-climbing parameters: " );
 
   if (pop->climbing_params == NULL)
-    pop->climbing_params = s_malloc(sizeof(ga_climbing_t));
+    {
+    if ( !(pop->climbing_params = s_malloc(sizeof(ga_climbing_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->climbing_params->mutate_allele = mutate_allele;
 
@@ -81,7 +84,7 @@ void ga_population_set_hillclimbing_parameters( population              *pop,
  **********************************************************************/
 
 
-int ga_random_ascent_hillclimbing(	population		*pop,
+GAULFUNC int ga_random_ascent_hillclimbing(	population		*pop,
 					entity			*best,
 					const int		max_iterations )
   {
@@ -192,7 +195,7 @@ int ga_random_ascent_hillclimbing(	population		*pop,
  **********************************************************************/
 
 
-int ga_next_ascent_hillclimbing(	population		*pop,
+GAULFUNC int ga_next_ascent_hillclimbing(	population		*pop,
 					entity			*best,
 					const int		max_iterations )
   {

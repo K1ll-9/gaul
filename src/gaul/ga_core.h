@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_core - Genetic algorithm routines.
-  Copyright ©2000-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -149,6 +149,9 @@ struct entity_t
   double	fitness;	/* Fitness score. */
   vpointer	*chromosome;	/* The chromosomes (the genotype). */
   vpointer	data;		/* User data containing physical properties. (the phenotype) */
+
+/* Additional stuff for multiobjective optimisation: */
+  double	*fitvector;	/* Fitness vector. */
   };
 
 /*
@@ -280,10 +283,12 @@ struct population_t
   int		max_size;		/* Current maximum population size. */
   int		stable_size;		/* Requested population size. */
   int		size;			/* Actual population size. */
-  int		orig_size;		/* Number of parents (entities at start of generation). */
+  int		orig_size;		/* Number of parents (entities at end of previous generation). */
   int		island;			/* Population's island. */
   int		free_index;		/* Next potentially free entity index. */
   int		generation;		/* For ga_population_get_generation(). */
+
+  int		fitness_dimensions;	/* Size of fitness vector (for multiobjective optimisation). */
 
   MemChunk	*entity_chunk;		/* Buffer for entity structures. */
   entity	**entity_array;		/* The population in id order. */
@@ -338,8 +343,11 @@ struct population_t
   GAgeneration_hook		generation_hook;
   GAiteration_hook		iteration_hook;
 
-  GAdata_destructor		data_destructor;
-  GAdata_ref_incrementor	data_ref_incrementor;
+  GAdata_destructor		data_destructor;        /* entity.data destructor */
+  GAdata_ref_incrementor	data_ref_incrementor;   /* entity.data reference counter incrementor */
+
+  GAdata_destructor		population_data_destructor;
+  GAdata_copy			population_data_copy;
 
   GAchromosome_constructor	chromosome_constructor;
   GAchromosome_destructor	chromosome_destructor;
@@ -361,7 +369,7 @@ struct population_t
 /*
  * Memory handling.
  */
-#if USE_CHROMO_CHUNKS == 1
+#ifdef USE_CHROMO_CHUNKS
   MemChunk			*chromoarray_chunk;
   MemChunk			*chromo_chunk;
 #endif
@@ -370,7 +378,7 @@ struct population_t
  * Execution locks.
  */
   THREAD_LOCK_DECLARE(lock);
-#if USE_CHROMO_CHUNKS == 1
+#ifdef USE_CHROMO_CHUNKS
   THREAD_LOCK_DECLARE(chromo_chunk_lock);
 #endif
   };

@@ -3,7 +3,7 @@
  **********************************************************************
 
   gaul_util.h - General header to define a few useful things
-  Copyright ©1999-2004, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©1999-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -54,7 +54,7 @@
 /*
  * Handle threading includes.
  */
-#if HAVE_PTHREADS == 1
+#ifdef HAVE_PTHREADS
 # include <pthread.h>
 # ifndef _REENTRANT
 #  define _REENTRANT
@@ -62,15 +62,15 @@
 #endif
 
 /*
- * For OpenMP code, USE_OPENMP must be defined as '1' and 
+ * For OpenMP code, USE_OPENMP must be defined and 
  * ga_init_openmp() must be called prior to any
  * other function.
  */
-#if USE_OPENMP == 1
+#ifdef USE_OPENMP
 # include <omp.h>
 #endif
 
-#if HAVE_PTHREADS == 1
+#ifdef HAVE_PTHREADS
 # define THREAD_LOCK_DECLARE(name)	pthread_mutex_t (name)
 # define THREAD_LOCK_DEFINE_STATIC(name)       static pthread_mutex_t (name) = PTHREAD_MUTEX_INITIALIZER
 # define THREAD_LOCK_DEFINE(name)	pthread_mutex_t (name) = PTHREAD_MUTEX_INITIALIZER
@@ -81,7 +81,7 @@
 # define THREAD_LOCK_NEW(name)		pthread_mutex_init(&(name), NULL)
 # define THREAD_LOCK_FREE(name)		pthread_mutex_destroy(&(name))
 #else
-# if USE_OPENMP == 1
+# ifdef USE_OPENMP
 #  define THREAD_LOCK_DECLARE(name)      omp_lock_t (name)
 #  define THREAD_LOCK_DEFINE_STATIC(name)       static omp_lock_t (name)
 #  define THREAD_LOCK_DEFINE(name)      omp_lock_t (name)
@@ -196,14 +196,7 @@ typedef void* vpointer;
 #endif
 
 typedef const void *constvpointer;
-/* byte is already defined on win32 systems. */
-#ifdef USE_WINDOWS_H
-# if USE_WINDOWS_H == 0
-typedef unsigned char byte;
-# endif
-#else
-typedef unsigned char byte;
-#endif
+typedef unsigned char gaulbyte;
 
 #ifdef BITSPERBYTE
 # define BYTEBITS	BITSPERBYTE
@@ -341,12 +334,12 @@ typedef unsigned char byte;
 /*
  * Wrappers for multi-statement macros.
  */
-#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#if defined(__GNUC__) || defined(__INTEL_COMPILER) || defined(_MSC_VER)
 #define MWRAP_BEGIN
 #define MWRAP_END
 #else
 #define MWRAP_BEGIN	do
-#define MWRAP_END	while(0==1);
+#define MWRAP_END	while(FALSE);
 #endif
 
 /*

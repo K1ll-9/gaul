@@ -40,9 +40,9 @@
 /*
  * Prototypes.
  */
-FUNCPROTO void ga_population_set_deterministiccrowding_parameters( population		*pop,
+GAULFUNC void ga_population_set_deterministiccrowding_parameters( population		*pop,
                                                          const GAcompare	compare );
-FUNCPROTO int ga_deterministiccrowding(    population              *pop,
+GAULFUNC int ga_deterministiccrowding(    population              *pop,
 	        const int               max_generations );
 
 #endif	/* GA_DETERMINISTICCROWDING_H_INCLUDED */

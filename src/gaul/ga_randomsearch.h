@@ -40,7 +40,7 @@
 /*
  * Prototypes.
  */
-FUNCPROTO int ga_random_search(population *pop, entity *initial, const int max_iterations);
+GAULFUNC int ga_random_search(population *pop, entity *initial, const int max_iterations);
 
 #endif	/* GA_RANDOMSEARCH_H_INCLUDED */
 

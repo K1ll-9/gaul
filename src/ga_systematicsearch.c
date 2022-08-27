@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_systematicsearch - Systematic algorithm for comparison and search.
-  Copyright ©2002-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2002-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -40,7 +40,7 @@
   last updated: 08 Nov 2002
  **********************************************************************/
 
-void ga_population_set_search_parameters( population              *pop,
+GAULFUNC void ga_population_set_search_parameters( population              *pop,
                                         GAscan_chromosome	scan_chromosome)
   {
 
@@ -48,7 +48,10 @@ void ga_population_set_search_parameters( population              *pop,
   if ( !scan_chromosome ) die("Null pointer to GAscan_chromosome callback passed.");
 
   if (pop->search_params == NULL)
-    pop->search_params = s_malloc(sizeof(ga_search_t));
+    {
+    if ( !(pop->search_params = s_malloc(sizeof(ga_search_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->search_params->scan_chromosome = scan_chromosome;
   pop->search_params->chromosome_state = 0;
@@ -71,7 +74,7 @@ void ga_population_set_search_parameters( population              *pop,
   last updated:	18 Feb 2005
  **********************************************************************/
 
-int ga_search(	population		*pop,
+GAULFUNC int ga_search(	population		*pop,
 		entity			*best)
   {
   int		iteration=0;		/* Current iteration number. */

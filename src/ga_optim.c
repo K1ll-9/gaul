@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_optim - Optimisation and evolution routines.
-  Copyright ©2000-2005, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -38,7 +38,6 @@
 
   To do:	Finish rewriting parallel versions, ga_evolution_mp() in particular.
 		Write ga_evolution_pvm().
-		Need to fix elitism/crowding stuff.
 		Remove much duplicated code.
 		OpenMOSIX fix.  See below.
 		gaul_adapt_and_evaluate_forked() and gaul_adapt_and_evaluate_threaded() are only parallelized for the case that no adaptation occurs.
@@ -66,7 +65,7 @@
  */
 #define NEED_MOSIX_FORK_HACK 1
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 /*
  * Convenience wrappers around MPI functions:
  *
@@ -270,13 +269,13 @@ static void gaul_debond_slaves_mpi(population *pop)
   last updated:	10 May 2004
  **********************************************************************/
 
-void ga_attach_mpi_slave( population *pop )
+GAULFUNC void ga_attach_mpi_slave( population *pop )
   {
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
   MPI_Status	status;			/* MPI status structure. */
   int		single_int;		/* Receive buffer. */
-  byte		*buffer=NULL;		/* Receive buffer. */
-  byte		*chromo=NULL;		/* Chromosome. */
+  gaulbyte		*buffer=NULL;		/* Receive buffer. */
+  gaulbyte		*chromo=NULL;		/* Chromosome. */
   boolean	finished=FALSE;		/* Whether this slave is done. */
   entity	*entity, *adult;	/* Received entity, adapted entity. */
   int		buffer_len=0;		/* Length of buffer to receive. */
@@ -303,7 +302,8 @@ void ga_attach_mpi_slave( population *pop )
   MPI_Recv(two_int, 2, MPI_INT, 0, GA_TAG_BUFFER_LEN, MPI_COMM_WORLD, &status);
   buffer_len = two_int[0];
   buffer_max = two_int[1];
-  buffer = s_malloc(buffer_len*sizeof(byte));
+  if ( !(buffer = s_malloc(buffer_len*sizeof(gaulbyte))) )
+    die("Unable to allocate memory");
 
 /* printf("DEBUG: slave buffer len %d %d\n", buffer_len, buffer_max);*/
 
@@ -401,9 +401,9 @@ void ga_attach_mpi_slave( population *pop )
   last updated:	10 May 2004
  **********************************************************************/
 
-void ga_detach_mpi_slaves(void)
+GAULFUNC void ga_detach_mpi_slaves(void)
   {
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
   int		i;			/* Loop variable over slave processes. */
   int		instruction=0;		/* Detach instruction. */
   int		mpi_size;		/* Number of slave processes. */
@@ -625,12 +625,12 @@ static void gaul_mutation(population *pop)
   last updated:	03 Feb 2003
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_evaluation_slave_mp(population *pop)
   {
   MPI_Status	status;			/* MPI status structure. */
   int		single_int;		/* Receive buffer. */
-  byte		*buffer;		/* Receive buffer. */
+  gaulbyte		*buffer;		/* Receive buffer. */
   boolean	finished=FALSE;		/* Whether this slave is done. */
   entity	*entity, *adult;	/* Received entity, adapted entity. */
   int	len=0;			/* Length of buffer to receive. */
@@ -640,7 +640,8 @@ static void gaul_evaluation_slave_mp(population *pop)
  * FIXME: This length data shouldn't be needed!
  */
   MPI_Recv(&len, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-  buffer = s_malloc(len*sizeof(byte));
+  if ( !(buffer = s_malloc(len*sizeof(gaulbyte))) )
+    die("Unable to allocate memory");
 
 /*printf("DEBUG: slave %d recieved %d (len)\n", rank, len);*/
 
@@ -746,7 +747,7 @@ static void gaul_ensure_evaluations(population *pop)
   last updated:	03 Feb 2003
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_ensure_evaluations_mp(population *pop)
   {
   int		i;			/* Loop variable over entity ranks. */
@@ -775,9 +776,9 @@ static void gaul_ensure_evaluations_mp(population *pop)
   last updated:	10 May 2004
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_ensure_evaluations_mpi( population *pop, int *eid,
-                        byte *buffer, int buffer_len, int buffer_max )
+                        gaulbyte *buffer, int buffer_len, int buffer_max )
   {
   MPI_Status	status;			/* MPI status structure. */
   double	single_double;		/* Recieve buffer. */
@@ -785,7 +786,7 @@ static void gaul_ensure_evaluations_mpi( population *pop, int *eid,
   int		mpi_size;		/* Number of slave processes. */
   int		process_num;		/* Number of remote processes running calculations. */
   int		eval_num;		/* Id of entity being processed. */
-  byte		*chromo=NULL;		/* Chromosome in byte form. */
+  gaulbyte		*chromo=NULL;		/* Chromosome in byte form. */
 
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
@@ -879,7 +880,7 @@ static void gaul_ensure_evaluations_mpi( population *pop, int *eid,
   last updated:	30 Jun 2002
  **********************************************************************/
 
-#if W32_CRIPPLED != 1
+#ifndef W32_CRIPPLED
 static void gaul_ensure_evaluations_forked(population *pop, const int num_processes,
 			int *eid, pid_t *pid, const int *evalpipe)
   {
@@ -997,7 +998,7 @@ static void gaul_ensure_evaluations_forked(population *pop, const int num_proces
   last updated:	18 Sep 2002
  **********************************************************************/
 
-#if HAVE_PTHREADS == 1
+#ifdef HAVE_PTHREADS
 
 typedef struct threaddata_s
   {
@@ -1229,7 +1230,7 @@ static void gaul_adapt_and_evaluate(population *pop)
   last updated:	03 Feb 2003
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_adapt_and_evaluate_mp(population *pop)
   {
   int		i;			/* Loop variable over entity ranks. */
@@ -1328,9 +1329,9 @@ static void gaul_adapt_and_evaluate_mp(population *pop)
   last updated:	24 Jun 2004
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_adapt_and_evaluate_mpi( population *pop, int *eid,
-                        byte *buffer, int buffer_len, int buffer_max )
+                        gaulbyte *buffer, int buffer_len, int buffer_max )
   {
   int		i;			/* Loop variable over entity ranks. */
   entity	*adult=NULL;		/* Adapted entity. */
@@ -1341,7 +1342,7 @@ static void gaul_adapt_and_evaluate_mpi( population *pop, int *eid,
   int		mpi_size;		/* Number of slave processes. */
   int		process_num;		/* Number of remote processes running calculations. */
   int		eval_num;		/* Id of entity being processed. */
-  byte		*chromo=NULL;		/* Chromosome in byte form. */
+  gaulbyte		*chromo=NULL;		/* Chromosome in byte form. */
 
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
@@ -1502,7 +1503,7 @@ static void gaul_adapt_and_evaluate_mpi( population *pop, int *eid,
   last updated:	11 Jun 2002
  **********************************************************************/
 
-#if W32_CRIPPLED != 1
+#ifndef W32_CRIPPLED
 static void gaul_adapt_and_evaluate_forked(population *pop,
 	       		const int num_processes,
 			int *eid, pid_t *pid, const int *evalpipe)
@@ -1668,7 +1669,7 @@ static void gaul_adapt_and_evaluate_forked(population *pop,
   last updated:	15 Apr 2004
  **********************************************************************/
 
-#if HAVE_PTHREADS == 1
+#ifdef HAVE_PTHREADS
 static void gaul_adapt_and_evaluate_threaded(population *pop,
 	       		const int max_threads,
 			threaddata_t *threaddata)
@@ -1825,33 +1826,66 @@ printf("DEBUG: Thread %d finished.  num_threads=%d eval_num=%d/%d\n", thread_num
 /**********************************************************************
   gaul_survival()
   synopsis:	Survival of the fittest.
-		Enforce elitism, apply crowding operator, reduce
+		Enforce elitism, reduce
 		population back to its stable size and rerank entities,
 		as required.
-
-		*** FIXME: crowding analysis incomplete. ***
-
   parameters:	population *pop
   return:	none
-  last updated:	18 Mar 2003
+  last updated:	25 Apr 2005
  **********************************************************************/
 
 static void gaul_survival(population *pop)
   {
-  int		i;			/* Loop variable over entity ranks. */
+  int		i, j, k;	/* Loop variable over entity ranks. */
+  boolean	save_entity;	/* Whether entity should survive. */
+  int		*set;		/* The best entities for each objective. */
+  boolean	*dominated;	/* Whether each entity is Pareto dominated. */
+  int		paretocount;	/* Size of Pareto set. */
+  boolean	dominance;	/* Used in determining dominance. */
 
   plog(LOG_VERBOSE, "*** Survival of the fittest ***");
 
+  if (pop->elitism == GA_ELITISM_PARENTS_SURVIVE)
+    {
 /*
- * Need to kill parents, or rescore parents?
+ * Sort all population members by fitness.
  */
-  if (pop->elitism == GA_ELITISM_PARENTS_DIE || pop->elitism == GA_ELITISM_ONE_PARENT_SURVIVES)
+    sort_population(pop);
+
+/*
+ * Ensure that any very bad solutions are not retained.
+ */
+    ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
+
+/*
+ * Least fit population members die to restore the
+ * population size to its stable size.
+ */
+    ga_genocide(pop, pop->stable_size);
+    }
+  else if (pop->elitism == GA_ELITISM_PARENTS_DIE || pop->elitism == GA_ELITISM_ONE_PARENT_SURVIVES)
     {
     while (pop->orig_size>(pop->elitism == GA_ELITISM_ONE_PARENT_SURVIVES))
       {
       pop->orig_size--;
       ga_entity_dereference_by_rank(pop, pop->orig_size);
       }
+
+/*
+ * Sort all population members by fitness.
+ */
+    sort_population(pop);
+
+/*
+ * Ensure that any very bad solutions are not retained.
+ */
+    ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
+
+/*
+ * Least fit population members die to restore the
+ * population size to its stable size.
+ */
+    ga_genocide(pop, pop->stable_size);
     }
   else if (pop->elitism == GA_ELITISM_RESCORE_PARENTS)
     {
@@ -1865,69 +1899,157 @@ static void gaul_survival(population *pop)
       if ( pop->evaluate(pop, pop->entity_iarray[i]) == FALSE )
         pop->entity_iarray[i]->fitness = GA_MIN_FITNESS;
       }
-    }
 
 /*
  * Sort all population members by fitness.
  */
-  sort_population(pop);
+    sort_population(pop);
 
 /*
- * Enforce the type of crowding desired.
- *
- * Rough crowding doesn't actual check whether two chromosomes are
- * identical - just assumes they are if they have identical
- * fitness.  Exact elitism does make the full check.
+ * Ensure that any very bad solutions are not retained.
  */
-#if 0
-    if (pop->elitism == GA_ELITISM_EXACT || pop->elitism == GA_ELITISM_ROUGH)
-      { /* Fatal version */
-      i = 1;
-
-      while (i<pop->size && i<pop->stable_size)
-        {
-        if (pop->entity_iarray[i]->fitness==pop->entity_iarray[i-1]->fitness &&
-            (pop->elitism != GA_ELITISM_EXACT ||
-             ga_compare_genome(pop, pop->entity_iarray[i], pop->entity_iarray[i-1])) )
-          {
-          ga_entity_dereference_by_rank(pop, i);
-          }
-        else
-          {
-          i++;
-          }
-        }
-      }
-    else if (pop->elitism == GA_ELITISM_EXACT_COMP || pop->elitism == GA_ELITISM_ROUGH_COMP)
-      { /* Increased competition version */
-      i = MIN(pop->size, pop->stable_size);
-      elitism_penalty = fabs(pop->entity_iarray[0]->fitness*GA_ELITISM_MULTIPLIER)
-                        + GA_ELITISM_CONSTANT;
-
-      while (i>0)
-        {
-        if (pop->entity_iarray[i]->fitness==pop->entity_iarray[i-1]->fitness &&
-            (pop->elitism != GA_ELITISM_EXACT_COMP ||
-             ga_compare_genome(pop, pop->entity_iarray[i], pop->entity_iarray[i-1])) )
-          {
-          pop->entity_iarray[i]->fitness -= elitism_penalty;
-          }
-        i--;
-        }
-
-      plog(LOG_VERBOSE, "*** Sorting again ***");
-
-      sort_population(pop);     /* FIXME: We could possibly (certianly) choose
-                                         a more optimal sort algorithm here. */
-      }
-#endif
+    ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
 
 /*
  * Least fit population members die to restore the
  * population size to its stable size.
  */
-  ga_genocide(pop, pop->stable_size);
-  ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
+    ga_genocide(pop, pop->stable_size);
+    }
+  else if (pop->elitism == GA_ELITISM_BEST_SET_SURVIVE)
+    {
+/* Find the best entities along each dimension of the fitness vector. */
+    if ( !(set = s_malloc(sizeof(int)*pop->fitness_dimensions)) )
+      die("Unable to allocate memory");
+
+/*
+ * Sort all population members by fitness.
+ */
+    sort_population(pop);
+
+/*
+ * Ensure that any very bad solutions are not retained.
+ */
+    ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
+
+    for (i=0; i<pop->fitness_dimensions; i++)
+      set[i]=0;
+
+#pragma omp parallel for \
+   shared(pop,set) private(i,j) \
+   schedule(static)
+    for (j=1; j<pop->size; j++)
+      {
+      for (i=0; i<pop->fitness_dimensions && set[i]==pop->orig_size; i++)
+        {
+        if ( pop->entity_iarray[j]->fitvector[i] >
+             pop->entity_iarray[set[i]]->fitvector[i] )
+          set[i]=j;
+        }
+      }
+
+/* Allow all parents in the best set to survive.  Make up to
+ * population's stable size with the fittest of the remainder.
+ */
+    k=pop->size;
+    while (k > 0 && pop->size > pop->stable_size)
+      {
+      k--;
+      save_entity = FALSE;
+      for (i=0; i<pop->fitness_dimensions; i++)
+        {
+        if (set[i] == k)
+          save_entity = TRUE;
+        }
+      if ( save_entity == FALSE )
+        ga_entity_dereference_by_rank(pop, k);
+      }
+
+    s_free(set);
+    }
+  else if (pop->elitism == GA_ELITISM_PARETO_SET_SURVIVE)
+    {
+/* 
+ * Find the Pareto set (i.e., all non-dominated entities) according
+ * to the fitness vector.  An entity is dominated if at least one other
+ * entity is better in all objectives.
+ */
+    if ( !(dominated = s_malloc(sizeof(int)*pop->size)) )
+      die("Unable to allocate memory");
+
+/*
+ * Sort all population members by fitness.
+ */
+    sort_population(pop);
+
+/*
+ * Ensure that any very bad solutions are not retained.
+ */
+    ga_genocide_by_fitness(pop, GA_MIN_FITNESS);
+
+    paretocount=pop->size;
+
+#pragma omp parallel for \
+   shared(pop,dominated) private(j) \
+   schedule(static)
+    for (j=0; j<pop->size; j++)
+      {
+      dominated[j] = FALSE;
+      }
+
+#pragma omp parallel for \
+   shared(pop,paretocount,dominated) private(i,j,k,dominance) \
+   schedule(static)
+    for (j=0; j<pop->size; j++)
+      {
+      for (k=0; k<pop->size && dominated[j] == FALSE; k++)
+        {
+        if ( k!=j )
+          {
+/* Is k better than j in all dimensions? */
+          dominance = TRUE;
+          for (i=0; i<pop->fitness_dimensions && dominance == TRUE; i++)
+            {
+            if ( pop->entity_iarray[j]->fitvector[i] >
+                 pop->entity_iarray[k]->fitvector[i] )
+              {
+              dominance = FALSE;
+              }
+            }
+          if (dominance == TRUE)
+            {
+            dominated[j] = TRUE;
+            paretocount--;
+            }
+          }
+        }
+      }
+
+/* Debug message: */
+/*
+    printf("Pareto set contains %d entities: ", paretocount);
+    for (j=0; j<pop->size; j++)
+      {
+      if (dominated[j] == FALSE)
+        printf(" %d", j);
+      }
+    printf("\n");
+*/
+
+/*
+ * Allow all entities in the Pareto set to survive.  Make up to
+ * population's stable size with the fittest of the remainder.
+ */
+    i = pop->size;
+    while ( i > 0 && pop->size > pop->stable_size )
+      {
+      i--;
+      if ( dominated[i] )
+        ga_entity_dereference_by_rank(pop, i);
+      }
+
+    s_free(dominated);
+    }
 
   return;
   }
@@ -1936,18 +2058,15 @@ static void gaul_survival(population *pop)
 /**********************************************************************
   gaul_survival_mp()
   synopsis:	Survival of the fittest.
-		Enforce elitism, apply crowding operator, reduce
+		Enforce elitism, reduce
 		population back to its stable size and rerank entities,
 		as required.
-
-		*** FIXME: crowding analysis incomplete. ***
-
   parameters:	population *pop
   return:	none
   last updated:	18 Mar 2003
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_survival_mp(population *pop)
   {
   int		i;			/* Loop variable over entity ranks. */
@@ -1987,16 +2106,6 @@ static void gaul_survival_mp(population *pop)
   sort_population(pop);
 
 /*
- * Enforce the type of crowding desired.
- *
- * Rough crowding doesn't actual check whether two chromosomes are
- * identical - just assumes they are if they have identical
- * fitness.  Exact elitism does make the full check.
- *
- * FIXME: Crowding code missing!!!
- */
-
-/*
  * Least fit population members die to restore the
  * population size to its stable size.
  */
@@ -2011,18 +2120,15 @@ static void gaul_survival_mp(population *pop)
 /**********************************************************************
   gaul_survival_mpi()
   synopsis:	Survival of the fittest.
-		Enforce elitism, apply crowding operator, reduce
+		Enforce elitism, reduce
 		population back to its stable size and rerank entities,
 		as required.
-
-		*** FIXME: crowding analysis incomplete. ***
-
   parameters:	population *pop
   return:	none
   last updated:	10 May 2004
  **********************************************************************/
 
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
 static void gaul_survival_mpi(population *pop)
   {
   int		i;			/* Loop variable over entity ranks. */
@@ -2061,16 +2167,6 @@ static void gaul_survival_mpi(population *pop)
   sort_population(pop);
 
 /*
- * Enforce the type of crowding desired.
- *
- * Rough crowding doesn't actual check whether two chromosomes are
- * identical - just assumes they are if they have identical
- * fitness.  Exact elitism does make the full check.
- *
- * FIXME: Crowding code missing!!!
- */
-
-/*
  * Least fit population members die to restore the
  * population size to its stable size.
  */
@@ -2085,19 +2181,16 @@ static void gaul_survival_mpi(population *pop)
 /**********************************************************************
   gaul_survival_forked()
   synopsis:	Survival of the fittest.
-		Enforce elitism, apply crowding operator, reduce
+		Enforce elitism, reduce
 		population back to its stable size and rerank entities,
 		as required.
-		Forked processing version.
-
-		*** FIXME: crowding analysis incomplete. ***
-
+		This is the forked processing version.
   parameters:	population *pop
   return:	none
   last updated:	18 Mar 2003
  **********************************************************************/
 
-#if W32_CRIPPLED != 1
+#ifndef W32_CRIPPLED
 static void gaul_survival_forked(population *pop,
 			const int num_processes,
 			int *eid, pid_t *pid, const int *evalpipe)
@@ -2215,16 +2308,6 @@ static void gaul_survival_forked(population *pop,
   sort_population(pop);
 
 /*
- * Enforce the type of crowding desired.
- *
- * Rough crowding doesn't actual check whether two chromosomes are
- * identical - just assumes they are if they have identical
- * fitness.  Exact elitism does make the full check.
- *
- * FIXME: Crowding code missing!!!
- */
-
-/*
  * Least fit population members die to restore the
  * population size to its stable size.
  */
@@ -2239,19 +2322,16 @@ static void gaul_survival_forked(population *pop,
 /**********************************************************************
   gaul_survival_threaded()
   synopsis:	Survival of the fittest.
-		Enforce elitism, apply crowding operator, reduce
+		Enforce elitism, reduce
 		population back to its stable size and rerank entities,
 		as required.
-		Threaded processing version.
-
-		*** FIXME: crowding analysis incomplete. ***
-
+		This is the threaded processing version.
   parameters:	population *pop
   return:	none
   last updated:	18 Mar 2003
  **********************************************************************/
 
-#if HAVE_PTHREADS == 1
+#ifdef HAVE_PTHREADS
 static void gaul_survival_threaded(population *pop,
 			const int max_threads,
 			threaddata_t *threaddata)
@@ -2356,16 +2436,6 @@ printf("DEBUG: Thread %d finished.  num_threads=%d eval_num=%d/%d\n", thread_num
   sort_population(pop);
 
 /*
- * Enforce the type of crowding desired.
- *
- * Rough crowding doesn't actual check whether two chromosomes are
- * identical - just assumes they are if they have identical
- * fitness.  Exact elitism does make the full check.
- *
- * FIXME: Crowding code missing!!!
- */
-
-/*
  * Least fit population members die to restore the
  * population size to its stable size.
  */
@@ -2389,7 +2459,7 @@ printf("DEBUG: Thread %d finished.  num_threads=%d eval_num=%d/%d\n", thread_num
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_evolution(	population		*pop,
+GAULFUNC int ga_evolution(	population		*pop,
 			const int		max_generations )
   {
   int		generation=0;		/* Current generation number. */
@@ -2460,7 +2530,7 @@ int ga_evolution(	population		*pop,
     gaul_survival(pop);
 
 /*
- * Use callback.
+ * End of generation.
  */
     plog(LOG_VERBOSE,
           "After generation %d, population has fitness scores between %f and %f",
@@ -2496,8 +2566,8 @@ int ga_evolution(	population		*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-#if W32_CRIPPLED != 1
-int ga_evolution_forked(	population		*pop,
+#ifndef W32_CRIPPLED
+GAULFUNC int ga_evolution_forked(	population		*pop,
 				const int		max_generations )
   {
   int		generation=0;		/* Current generation number. */
@@ -2534,9 +2604,13 @@ int ga_evolution_forked(	population		*pop,
  * Open pipes for reporting fitnesses.
  * Clear pid and eid arrays.
  */
-  pid = s_malloc(max_processes*sizeof(pid_t));
-  eid = s_malloc(max_processes*sizeof(int));
-  evalpipe = s_malloc(2*max_processes*sizeof(int));
+  if ( !(pid = s_malloc(max_processes*sizeof(pid_t))) )
+    die("Unable to allocate memory");
+  if ( !(eid = s_malloc(max_processes*sizeof(int))) )
+    die("Unable to allocate memory");
+  if ( !(evalpipe = s_malloc(2*max_processes*sizeof(int))) )
+    die("Unable to allocate memory");
+
   for (i=0; i<max_processes; i++)
     {
     if (pipe(&evalpipe[2*i])==-1) die("Unable to open pipe");
@@ -2619,7 +2693,7 @@ int ga_evolution_forked(	population		*pop,
   return generation;
   }
 #else
-int ga_evolution_forked(	population		*pop,
+GAULFUNC int ga_evolution_forked(	population		*pop,
 				const int		max_generations )
   {
   die("Sorry, the ga_evolution_forked() function isn't available for Windows.");
@@ -2646,8 +2720,8 @@ int ga_evolution_forked(	population		*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-#if HAVE_PTHREADS == 1
-int ga_evolution_threaded(	population		*pop,
+#ifdef HAVE_PTHREADS
+GAULFUNC int ga_evolution_threaded(	population		*pop,
 				const int		max_generations )
   {
   int		generation=0;		/* Current generation number. */
@@ -2678,7 +2752,9 @@ int ga_evolution_threaded(	population		*pop,
 /*
  * Allocate memory required for handling the threads.
  */
-  threaddata = s_malloc(sizeof(threaddata_t)*max_threads);
+  if ( !(threaddata = s_malloc(sizeof(threaddata_t)*max_threads)) )
+    die("Unable to allocate memory");
+
   for (i=0; i<max_threads; i++)
     threaddata[i].pop = pop;
 
@@ -2749,7 +2825,7 @@ int ga_evolution_threaded(	population		*pop,
   return generation;
   }
 #else
-int ga_evolution_threaded(	population		*pop,
+GAULFUNC int ga_evolution_threaded(	population		*pop,
 				const int		max_generations )
   {
 
@@ -2778,9 +2854,9 @@ int ga_evolution_threaded(	population		*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-#if HAVE_PTHREADS == -2
+#if defined(HAVE_PTHREADS) && HAVE_PTHREADS == -2
 /* Old version of code. */
-int ga_evolution_threaded(	population		*pop,
+GAULFUNC void ga_evolution_threaded(	population		*pop,
 				const int		max_generations )
   {
   int			generation=0;		/* Current generation number. */
@@ -2822,10 +2898,15 @@ int ga_evolution_threaded(	population		*pop,
  * Allocate memory required for handling the threads.
  * Initially use eid array to pass thread enumerations.
  */
-  tid = s_malloc(max_threads*sizeof(pthread_t));
-  mid = s_malloc(max_threads*sizeof(pthread_mutex_t));
-  cid = s_malloc(max_threads*sizeof(pthread_cond_t));
-  eid = s_malloc(max_threads*sizeof(int));
+  if ( !(tid = s_malloc(max_threads*sizeof(pthread_t))) )
+    die("Unable to allocate memory");
+  if ( !(mid = s_malloc(max_threads*sizeof(pthread_mutex_t))) )
+    die("Unable to allocate memory");
+  if ( !(cid = s_malloc(max_threads*sizeof(pthread_cond_t))) )
+    die("Unable to allocate memory");
+  if ( !(eid = s_malloc(max_threads*sizeof(int))) )
+    die("Unable to allocate memory");
+
   for (i=0; i<max_threads; i++)
     {
     eid[i] = i;
@@ -2950,7 +3031,7 @@ int ga_evolution_threaded(	population		*pop,
 
 #ifdef COMPILE_DEPRECATED_FUNCTIONS
 
-int ga_evolution_with_stats(	population		*pop,
+GAULFUNC void ga_evolution_with_stats(	population		*pop,
 					const ga_elitism_type	elitism,
 					const int		max_generations )
   {
@@ -3242,7 +3323,7 @@ int ga_evolution_with_stats(	population		*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_evolution_steady_state(	population		*pop,
+GAULFUNC int ga_evolution_steady_state(	population		*pop,
 				const int		max_iterations )
   {
   int		iteration=0;		/* Current iteration count. */
@@ -3443,7 +3524,7 @@ int ga_evolution_steady_state(	population		*pop,
     if (child) pop->replace(pop, child);
 
 /*
- * Use callback.
+ * End of generation.
  */
     plog(LOG_VERBOSE, "*** Analysis ***");
 
@@ -3473,7 +3554,7 @@ int ga_evolution_steady_state(	population		*pop,
 
 #ifdef COMPILE_DEPRECATED_FUNCTIONS
 
-int ga_evolution_steady_state_with_stats(	population	*pop,
+GAULFUNC void ga_evolution_steady_state_with_stats(	population	*pop,
 						const int	max_iterations )
   {
   int		iteration=0;		/* Current iteration count. */
@@ -3732,7 +3813,7 @@ int ga_evolution_steady_state_with_stats(	population	*pop,
     if (child) pop->replace(pop, child);
 
 /*
- * Use callback.
+ * End of generation.
  */
     plog(LOG_VERBOSE, "*** Analysis ***");
 
@@ -3773,7 +3854,7 @@ int ga_evolution_steady_state_with_stats(	population	*pop,
 
 #ifdef COMPILE_DEPRECATED_FUNCTIONS
 
-entity *ga_random_mutation_hill_climbing(	population	*pop,
+GAULFUNC entity *ga_random_mutation_hill_climbing(	population	*pop,
 						entity		*initial,
 						const int	max_iterations)
   {
@@ -4061,7 +4142,7 @@ entity *old_ga_next_ascent_hill_climbing(	population		*pop,
 
 #ifdef COMPILE_DEPRECATED_FUNCTIONS
 
-entity *ga_metropolis_mutation(	population		*pop,
+GAULFUNC entity *ga_metropolis_mutation(	population		*pop,
 				entity			*initial,
 				const int		max_iterations,
 				const int 		temperature)
@@ -4209,7 +4290,7 @@ entity *ga_metropolis_mutation(	population		*pop,
 
 #ifdef COMPILE_DEPRECATED_FUNCTIONS
 
-entity *ga_simulated_annealling_mutation(population	*pop,
+GAULFUNC entity *ga_simulated_annealling_mutation(population	*pop,
 					entity		*initial,
 					const int	max_iterations,
 					const int 	initial_temperature,
@@ -4352,7 +4433,7 @@ entity *ga_simulated_annealling_mutation(population	*pop,
   ga_evolution_archipelago()
   synopsis:	Main genetic algorithm routine.  Performs GA-based
 		optimisation on the given populations using a simple
-		current_island model.  Migration occurs around a cyclic
+		island model.  Migration occurs around a cyclic
 		topology only.  Migration causes a duplication of the
 		respective entities.  This is a generation-based GA.
 		ga_genesis(), or equivalent, must be called prior to
@@ -4364,12 +4445,12 @@ entity *ga_simulated_annealling_mutation(population	*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_evolution_archipelago( const int num_pops,
+GAULFUNC int ga_evolution_archipelago( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
   int		generation=0;		/* Current generation number. */
-  int		current_island;			/* Current current_island number. */
+  int		current_island;		/* Current current_island number. */
   population	*pop=NULL;		/* Current population. */
   boolean	complete=FALSE;		/* Whether evolution is terminated. */
 
@@ -4377,7 +4458,7 @@ int ga_evolution_archipelago( const int num_pops,
   if (!pops)
     die("NULL pointer to array of population structures passed.");
   if (num_pops<2)
-    die("Need at least two populations for the current_island model.");
+    die("Need at least two populations for the island model.");
 
   for (current_island=0; current_island<num_pops; current_island++)
     {
@@ -4488,7 +4569,7 @@ int ga_evolution_archipelago( const int num_pops,
   ga_evolution_archipelago_mpi()
   synopsis:	Main genetic algorithm routine.  Performs GA-based
 		optimisation on the given populations using a simple
-		current_island model.  Migration occurs around a cyclic
+		island model.  Migration occurs around a cyclic
 		topology only.  Migration causes a duplication of the
 		respective entities.  This is a generation-based GA.
 		ga_genesis(), or equivalent, must be called prior to
@@ -4500,18 +4581,18 @@ int ga_evolution_archipelago( const int num_pops,
   last updated:	21 Feb 2005
  **********************************************************************/
 
-int ga_evolution_archipelago_mpi( const int num_pops,
+GAULFUNC int ga_evolution_archipelago_mpi( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
-#if HAVE_MPI==1
+#ifdef HAVE_MPI
   int		current_island;		/* Current current_island number. */
   population	*pop=NULL;		/* Current population. */
   boolean	complete=FALSE;		/* Whether evolution is terminated. */
   int		generation=0;		/* Current generation number. */
   int		mpi_rank;		/* Rank of MPI process; should always by 0 here. */
   int		mpi_size;		/* Number of MPI processes. */
-  byte		*buffer=NULL;		/* Send buffer. */
+  gaulbyte		*buffer=NULL;		/* Send buffer. */
   int		buffer_len=0;		/* Length of send buffer. */
   int		buffer_max=0;		/* Length of send buffer. */
   int		*eid;			/* Sorage of entity ids being processed. */
@@ -4520,7 +4601,7 @@ int ga_evolution_archipelago_mpi( const int num_pops,
   if (!pops)
     die("NULL pointer to array of population structures passed.");
   if (num_pops<2)
-    die("Need at least two populations for the current_island model.");
+    die("Need at least two populations for the island model.");
 
   for (current_island=0; current_island<num_pops; current_island++)
     {
@@ -4564,10 +4645,14 @@ int ga_evolution_archipelago_mpi( const int num_pops,
  */
   buffer_len = pop->chromosome_to_bytes(pop, pop->entity_iarray[0], &buffer, &buffer_max);
   if (buffer_max == 0)
-    buffer = s_malloc(buffer_len*sizeof(byte));
+    {
+    if ( !(buffer = s_malloc(buffer_len*sizeof(gaulbyte))) )
+      die("Unable to allocate memory");
+    }
 
   MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-  eid = s_malloc(mpi_size*sizeof(int));
+  if ( !(eid = s_malloc(mpi_size*sizeof(int))) )
+    die("Unable to allocate memory");
 
 /*
  * Register, set up and synchronise slave processes.
@@ -4656,7 +4741,7 @@ int ga_evolution_archipelago_mpi( const int num_pops,
           pop->entity_iarray[pop->size-1]->fitness );
 
 /*
- * Use callback.
+ * End of generation.
  */
     plog( LOG_VERBOSE,
           "After generation %d, population has fitness scores between %f and %f",
@@ -4690,7 +4775,7 @@ int ga_evolution_archipelago_mpi( const int num_pops,
   ga_evolution_archipelago_threaded()
   synopsis:	Main genetic algorithm routine.  Performs GA-based
 		optimisation on the given populations using a simple
-		current_island model.  Migration occurs around a cyclic
+		island model.  Migration occurs around a cyclic
 		topology only.  Migration causes a duplication of the
 		respective entities.  This is a generation-based GA.
 		ga_genesis(), or equivalent, must be called prior to
@@ -4705,8 +4790,8 @@ int ga_evolution_archipelago_mpi( const int num_pops,
   last updated:	18 Feb 2005
  **********************************************************************/
 
-#if HAVE_PTHREADS == 1
-int ga_evolution_archipelago_threaded( const int num_pops,
+#ifdef HAVE_PTHREADS
+GAULFUNC int ga_evolution_archipelago_threaded( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
@@ -4723,7 +4808,7 @@ int ga_evolution_archipelago_threaded( const int num_pops,
   if (!pops)
     die("NULL pointer to array of population structures passed.");
   if (num_pops<2)
-    die("Need at least two populations for the current_island model.");
+    die("Need at least two populations for the island model.");
 
   for (current_island=0; current_island<num_pops; current_island++)
     {
@@ -4755,7 +4840,9 @@ int ga_evolution_archipelago_threaded( const int num_pops,
 /*
  * Allocate memory required for handling the threads.
  */
-  threaddata = s_malloc(sizeof(threaddata_t)*max_threads);
+  if ( !(threaddata = s_malloc(sizeof(threaddata_t)*max_threads)) )
+    die("Unable to allocate memory");
+
   pop->generation = 0;
 
   for (current_island=0; current_island<num_pops; current_island++)
@@ -4851,7 +4938,7 @@ int ga_evolution_archipelago_threaded( const int num_pops,
   return generation;
   }
 #else
-int ga_evolution_archipelago_threaded( const int num_pops,
+GAULFUNC int ga_evolution_archipelago_threaded( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
@@ -4865,7 +4952,7 @@ int ga_evolution_archipelago_threaded( const int num_pops,
   ga_evolution_archipelago_forked()
   synopsis:	Main genetic algorithm routine.  Performs GA-based
 		optimisation on the given populations using a simple
-		current_island model.  Migration occurs around a cyclic
+		island model.  Migration occurs around a cyclic
 		topology only.  Migration causes a duplication of the
 		respective entities.  This is a generation-based GA.
 		ga_genesis(), or equivalent, must be called prior to
@@ -4879,8 +4966,8 @@ int ga_evolution_archipelago_threaded( const int num_pops,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-#if W32_CRIPPLED != 1
-int ga_evolution_archipelago_forked( const int num_pops,
+#ifndef W32_CRIPPLED
+GAULFUNC int ga_evolution_archipelago_forked( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
@@ -4905,7 +4992,7 @@ int ga_evolution_archipelago_forked( const int num_pops,
   if (!pops)
     die("NULL pointer to array of population structures passed.");
   if (num_pops<2)
-    die("Need at least two populations for the current_island model.");
+    die("Need at least two populations for the island model.");
 
   pop->generation = 0;
 
@@ -4932,9 +5019,13 @@ int ga_evolution_archipelago_forked( const int num_pops,
  * Open pipes for reporting fitnesses.
  * Clear pid and eid arrays.
  */
-  pid = s_malloc(max_processes*sizeof(pid_t));
-  eid = s_malloc(max_processes*sizeof(int));
-  evalpipe = s_malloc(2*max_processes*sizeof(int));
+  if ( !(pid = s_malloc(max_processes*sizeof(pid_t))) )
+    die("Unable to allocate memory");
+  if ( !(eid = s_malloc(max_processes*sizeof(int))) )
+    die("Unable to allocate memory");
+  if ( !(evalpipe = s_malloc(2*max_processes*sizeof(int))) )
+    die("Unable to allocate memory");
+
   for (i=0; i<max_processes; i++)
     {
     if (pipe(&evalpipe[2*i])==-1) die("Unable to open pipe");
@@ -5058,7 +5149,7 @@ int ga_evolution_archipelago_forked( const int num_pops,
   return generation;
   }
 #else
-int ga_evolution_archipelago_forked( const int num_pops,
+GAULFUNC int ga_evolution_archipelago_forked( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
@@ -5072,7 +5163,7 @@ int ga_evolution_archipelago_forked( const int num_pops,
   ga_evolution_archipelago_mp()
   synopsis:	Main genetic algorithm routine.  Performs GA-based
 		optimisation on the given populations using a simple
-		current_island model.  Migration occurs around a cyclic
+		island model.  Migration occurs around a cyclic
 		topology only.  Migration causes a duplication of the
 		respective entities.  This is a generation-based GA.
 		This is a multi-processor version with uses one
@@ -5092,11 +5183,11 @@ int ga_evolution_archipelago_forked( const int num_pops,
   last updated:	11 Jun 2002
  **********************************************************************/
 
-int ga_evolution_archipelago_mp( const int num_pops,
+GAULFUNC int ga_evolution_archipelago_mp( const int num_pops,
 			population		**pops,
 			const int		max_generations )
   {
-#if HAVE_MPI == 1
+#ifdef HAVE_MPI
   int		generation=0;		/* Current generation number. */
   int		current_island;			/* Current current_island number. */
   int		i;			/* Loop over members of population. */
@@ -5154,7 +5245,8 @@ int ga_evolution_archipelago_mp( const int num_pops,
     }
 
   /* Allocate send_mask array. */
-  send_mask = s_malloc(max_size*sizeof(boolean));
+  if ( !(send_mask = s_malloc(max_size*sizeof(boolean))) )
+    die("Unable to allocate memory");
 
 /* Do all the generations: */
   while ( generation<max_generations && complete==FALSE)
@@ -5310,10 +5402,10 @@ int ga_evolution_archipelago_mp( const int num_pops,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_evolution_mp(	population		*pop,
+GAULFUNC int ga_evolution_mp(	population		*pop,
 			const int		max_generations )
   {
-#if HAVE_MPI==1
+#ifdef HAVE_MPI
   int		generation=0;		/* Current generation number. */
 
 /* Checks. */
@@ -5391,7 +5483,7 @@ int ga_evolution_mp(	population		*pop,
       gaul_survival_mp(pop);
 
 /*
- * Use callback.
+ * End of generation.
  */
       plog(LOG_VERBOSE,
            "After generation %d, population has fitness scores between %f and %f",
@@ -5432,14 +5524,14 @@ int ga_evolution_mp(	population		*pop,
   last updated:	17 Feb 2005
  **********************************************************************/
 
-int ga_evolution_mpi(	population		*pop,
+GAULFUNC int ga_evolution_mpi(	population		*pop,
 			const int		max_generations )
   {
-#if HAVE_MPI==1
+#ifdef HAVE_MPI
   int	generation=0;		/* Current generation number. */
   int	mpi_rank;		/* Rank of MPI process; should always by 0 here. */
   int	mpi_size;		/* Number of MPI processes. */
-  byte	*buffer=NULL;		/* Send buffer. */
+  gaulbyte	*buffer=NULL;		/* Send buffer. */
   int	buffer_len=0;		/* Length of send buffer. */
   int	buffer_max=0;		/* Length of send buffer. */
   int	*eid;			/* Sorage of entity ids being processed. */
@@ -5478,9 +5570,13 @@ int ga_evolution_mpi(	population		*pop,
  */
   buffer_len = pop->chromosome_to_bytes(pop, pop->entity_iarray[0], &buffer, &buffer_max);
   if (buffer_max == 0)
-    buffer = s_malloc(buffer_len*sizeof(byte));
+    {
+    if ( !(buffer = s_malloc(buffer_len*sizeof(gaulbyte))) )
+      die("Unable to allocate memory");
+    }
 
-  eid = s_malloc(mpi_size*sizeof(int));
+  if ( !(eid = s_malloc(mpi_size*sizeof(int))) )
+    die("Unable to allocate memory");
 
 /*
  * Register, set up and synchronise slave processes.
@@ -5539,7 +5635,7 @@ int ga_evolution_mpi(	population		*pop,
     gaul_survival_mpi(pop);
 
 /*
- * Use callback.
+ * End of generation.
  */
     plog( LOG_VERBOSE,
           "After generation %d, population has fitness scores between %f and %f",

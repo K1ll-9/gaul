@@ -40,9 +40,9 @@
 /*
  * Prototypes.
  */
-FUNCPROTO void ga_population_set_hillclimbing_parameters(population *pop, GAmutate_allele mutate_allele);
-FUNCPROTO int ga_next_ascent_hillclimbing(population *pop, entity *initial, const int max_iterations);
-FUNCPROTO int ga_random_ascent_hillclimbing(population *pop, entity *initial, const int max_iterations);
+GAULFUNC void ga_population_set_hillclimbing_parameters(population *pop, GAmutate_allele mutate_allele);
+GAULFUNC int ga_next_ascent_hillclimbing(population *pop, entity *initial, const int max_iterations);
+GAULFUNC int ga_random_ascent_hillclimbing(population *pop, entity *initial, const int max_iterations);
 
 #endif	/* GA_CLIMBING_H_INCLUDED */
 

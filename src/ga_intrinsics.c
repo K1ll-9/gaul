@@ -3,7 +3,7 @@
  **********************************************************************
 
   ga_intrinics - Genetic algorithm routine intrinsics.
-  Copyright ©2000-2004, Stewart Adcock <stewart@linux-domain.com>
+  Copyright ©2000-2006, Stewart Adcock <stewart@linux-domain.com>
   All rights reserved.
 
   The latest version of this program should be available at:
@@ -44,7 +44,7 @@
 
 #include "gaul/ga_intrinsics.h"
 
-#if HAVE_SLANG==1
+#ifdef HAVE_SLANG
 
 /**********************************************************************
   ga_population_new_slang()
@@ -358,7 +358,7 @@ static int ga_entity_migrate_slang(int *srcpop_id, int *destpop_id, int *jacques
   last updated: 18/10/00
  **********************************************************************/
 
-boolean ga_singlepoint_crossover_chromosome(int *father, int *mother, int *son, int *daughter)
+GAULFUNC boolean ga_singlepoint_crossover_chromosome(int *father, int *mother, int *son, int *daughter)
   {
   }
 
@@ -372,7 +372,7 @@ boolean ga_singlepoint_crossover_chromosome(int *father, int *mother, int *son, 
   last updated: 14/02/01
  **********************************************************************/
 
-int ga_crossover_chromosome_singlepoints_slang(int *pop_id,
+GAULFUNC void ga_crossover_chromosome_singlepoints_slang(int *pop_id,
                      int *father, int *mother, int *son, int *daughter)
   {
   population	*pop;			/* Active population structure. */
@@ -778,6 +778,21 @@ static double ga_entity_get_fitness_slang(int *pop, int *id)
 
 
 /**********************************************************************
+  ga_entity_set_fitness_slang()
+  synopsis:	Access entity's fitness field.
+  parameters:
+  return:
+  last updated:	07 Aug 2005
+ **********************************************************************/
+
+static int ga_entity_set_fitness_slang(int *pop, int *id, double *fitness)
+  {
+  ga_get_entity_from_id(ga_get_population_from_id(*pop), *id)->fitness = *fitness;
+  return TRUE;
+  }
+
+
+/**********************************************************************
   ga_entity_isallocated_slang()
   synopsis:	Determine whether the given entity id is used.
   parameters:
@@ -873,7 +888,7 @@ static int ga_allele_search_slang(	int	*pop_id,
   last updated:	18 Mar 2002
  **********************************************************************/
 
-int ga_metropolis_slang(	int	*pop_id,
+GAULFUNC void ga_metropolis_slang(	int	*pop_id,
 				int	*entity_id,
 				int	*num_iterations,
 				int 	*temperature)
@@ -921,7 +936,7 @@ static int ga_sa_slang(	int	*pop_id,
 
 
 /**********************************************************************
-  ga_simpex_slang()
+  ga_simplex_slang()
   synopsis:	Wrapper around ga_simplex()
 		for the scripted API.
   parameters:
@@ -944,6 +959,29 @@ static int ga_simplex_slang(	int	*pop_id,
   num_iter = ga_simplex( pop, initial, *max_iterations );
 
   return num_iter;
+  }
+
+
+/**********************************************************************
+  ga_differentialevolution_slang()
+  synopsis:	Wrapper around ga_differentialevolution()
+		for the scripted API.
+  parameters:
+  return:	Index of best solution found (A new entity).
+  last updated:	25 Apr 2005
+ **********************************************************************/
+
+static int ga_differentialevolution_slang(	int	*pop_id,
+			int	*max_generations )
+  {
+  population	*pop;		/* Active population structure. */
+  int		num_gen;	/* Number of iterations performed. */
+
+  pop = ga_get_population_from_id(*pop_id);
+
+  num_gen = ga_differentialevolution( pop, *max_generations );
+
+  return num_gen;
   }
 
 
@@ -1293,19 +1331,31 @@ static void ga_slang_replace(population *pop, entity *child)
   last updated:	18 Mar 2003
  **********************************************************************/
 
-#if HAVE_SLANG==0
-boolean ga_intrinsic_sladd(void)
+#ifndef HAVE_SLANG
+GAULFUNC boolean ga_intrinsic_sladd(void)
   {
   plog(LOG_WARNING, "No S-Lang support compiled into GAUL.");
   return TRUE;
   }
 #else
 
-boolean ga_intrinsic_sladd(void)
+GAULFUNC boolean ga_intrinsic_sladd(void)
   {
   static double	fitnessmin=GA_MIN_FITNESS;      /* Minimum fitness. */
-  static int	schemes[7]={GA_SCHEME_DARWIN, GA_SCHEME_LAMARCK_PARENTS, GA_SCHEME_LAMARCK_CHILDREN, GA_SCHEME_LAMARCK_ALL, GA_SCHEME_BALDWIN_PARENTS, GA_SCHEME_BALDWIN_CHILDREN, GA_SCHEME_BALDWIN_ALL};
-  static int	elitism[5]={GA_ELITISM_UNKNOWN, GA_ELITISM_PARENTS_SURVIVE, GA_ELITISM_ONE_PARENT_SURVIVES, GA_ELITISM_PARENTS_DIE, GA_ELITISM_RESCORE_PARENTS};
+  static int	schemes[7]={GA_SCHEME_DARWIN,
+                            GA_SCHEME_LAMARCK_PARENTS,
+                            GA_SCHEME_LAMARCK_CHILDREN,
+                            GA_SCHEME_LAMARCK_ALL,
+                            GA_SCHEME_BALDWIN_PARENTS,
+                            GA_SCHEME_BALDWIN_CHILDREN,
+                            GA_SCHEME_BALDWIN_ALL};
+  static int	elitism[7]={GA_ELITISM_UNKNOWN,
+                            GA_ELITISM_PARENTS_SURVIVE,
+                            GA_ELITISM_ONE_PARENT_SURVIVES,
+                            GA_ELITISM_PARENTS_DIE,
+                            GA_ELITISM_BEST_SET_SURVIVE,
+                            GA_ELITISM_PARETO_SET_SURVIVE,
+                            GA_ELITISM_RESCORE_PARENTS};
 
   if (  SLadd_intrinsic_variable("GA_SCHEME_DARWIN", &(schemes[0]), SLANG_INT_TYPE, TRUE)
      || SLadd_intrinsic_variable("GA_SCHEME_LAMARCK_PARENTS", &(schemes[1]), SLANG_INT_TYPE, TRUE)
@@ -1318,7 +1368,9 @@ boolean ga_intrinsic_sladd(void)
      || SLadd_intrinsic_variable("GA_ELITISM_PARENTS_SURVIVE", &(elitism[1]), SLANG_INT_TYPE, TRUE)
      || SLadd_intrinsic_variable("GA_ELITISM_ONE_PARENT_SURVIVES", &(elitism[2]), SLANG_INT_TYPE, TRUE)
      || SLadd_intrinsic_variable("GA_ELITISM_PARENTS_DIE", &(elitism[3]), SLANG_INT_TYPE, TRUE)
-     || SLadd_intrinsic_variable("GA_ELITISM_RESCORE_PARENTS", &(elitism[4]), SLANG_INT_TYPE, TRUE)
+     || SLadd_intrinsic_variable("GA_ELITISM_BEST_SET_SURVIVE", &(elitism[4]), SLANG_INT_TYPE, TRUE)
+     || SLadd_intrinsic_variable("GA_ELITISM_PARETO_SET_SURVIVE", &(elitism[5]), SLANG_INT_TYPE, TRUE)
+     || SLadd_intrinsic_variable("GA_ELITISM_RESCORE_PARENTS", &(elitism[6]), SLANG_INT_TYPE, TRUE)
      || SLadd_intrinsic_variable("GA_FITNESS_MIN", &fitnessmin, SLANG_DOUBLE_TYPE, TRUE)
      ) return FALSE;
 
@@ -1433,6 +1485,9 @@ boolean ga_intrinsic_sladd(void)
       || SLadd_intrinsic_function("ga_entity_get_fitness",
             (FVOID_STAR) ga_entity_get_fitness_slang, SLANG_DOUBLE_TYPE, 2,
             SLANG_INT_TYPE, SLANG_INT_TYPE)
+      || SLadd_intrinsic_function("ga_entity_set_fitness",
+            (FVOID_STAR) ga_entity_set_fitness_slang, SLANG_INT_TYPE, 3,
+            SLANG_INT_TYPE, SLANG_INT_TYPE, SLANG_DOUBLE_TYPE)
       || SLadd_intrinsic_function("ga_entity_isallocated",
             (FVOID_STAR) ga_entity_isallocated_slang, SLANG_INT_TYPE, 2,
             SLANG_INT_TYPE, SLANG_INT_TYPE)
@@ -1457,6 +1512,9 @@ boolean ga_intrinsic_sladd(void)
       || SLadd_intrinsic_function("ga_simplex",
             (FVOID_STAR) ga_simplex_slang, SLANG_INT_TYPE, 3,
             SLANG_INT_TYPE, SLANG_INT_TYPE, SLANG_INT_TYPE)
+      || SLadd_intrinsic_function("ga_differentialevolution",
+            (FVOID_STAR) ga_differentialevolution_slang, SLANG_INT_TYPE, 2,
+            SLANG_INT_TYPE, SLANG_INT_TYPE)
       || SLadd_intrinsic_function("ga_nahc",
             (FVOID_STAR) ga_nahc_slang, SLANG_INT_TYPE, 3,
             SLANG_INT_TYPE, SLANG_INT_TYPE, SLANG_INT_TYPE)

@@ -42,12 +42,11 @@
 
 #ifdef WIN32
 #  ifdef BUILDING_DLL
-#    define FUNCPROTO __declspec (dllexport)
+#    define GAULFUNC __declspec (dllexport)
 #  else
-#    define FUNCPROTO __declspec (dllimport)
+#    define GAULFUNC __declspec (dllimport)
 #  endif
 #else
-#  define FUNCPROTO
+#  define GAULFUNC
 #endif
-
 

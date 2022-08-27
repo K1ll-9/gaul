@@ -49,7 +49,7 @@
   last updated:	24 Feb 2005
  **********************************************************************/
 
-int ga_rank_fitness(	population *alphapop, entity *alpha,
+GAULFUNC int ga_rank_fitness(	population *alphapop, entity *alpha,
 			population *betapop, entity *beta )
   {
 

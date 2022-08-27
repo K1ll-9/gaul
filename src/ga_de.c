@@ -50,7 +50,7 @@
   last updated: 12 Apr 2005
  **********************************************************************/
 
-void ga_population_set_differentialevolution_parameters( population *pop,
+GAULFUNC void ga_population_set_differentialevolution_parameters( population *pop,
                                                          const ga_de_strategy_type strategy,
                                                          const ga_de_crossover_type crossover,
                                                          const int num_perturbed,
@@ -64,7 +64,10 @@ void ga_population_set_differentialevolution_parameters( population *pop,
   plog( LOG_VERBOSE, "Population's differential evolution parameters set" );
 
   if (pop->de_params == NULL)
-    pop->de_params = s_malloc(sizeof(ga_de_t));
+    {
+    if ( !(pop->de_params = s_malloc(sizeof(ga_de_t))) )
+      die("Unable to allocate memory");
+    }
 
   pop->de_params->strategy = strategy;
   pop->de_params->crossover_method = crossover;
@@ -113,7 +116,7 @@ static void _gaul_pick_random_entities(int *permutation, int num, int size, int 
   last updated:	12 Apr 2005
  **********************************************************************/
 
-int ga_differentialevolution(	population		*pop,
+GAULFUNC int ga_differentialevolution(	population		*pop,
 				const int		max_generations )
   {
   int		generation=0;		/* Current generation number. */
@@ -162,7 +165,9 @@ int ga_differentialevolution(	population		*pop,
 /*
  * Prepare arrays to store permutations.
  */
-  permutation = s_malloc(sizeof(int)*pop->size);
+  if ( !(permutation = s_malloc(sizeof(int)*pop->size)) )
+    die("Unable to allocate memory");
+
   for (i=0; i<pop->size; i++)
     permutation[i]=i;
 
@@ -702,6 +707,11 @@ int ga_differentialevolution(	population		*pop,
  * Ensure final ordering of population is correct.
  */
   sort_population(pop);
+
+/*
+ * Clean-up.
+ */
+  s_free(permutation);
 
   return generation;
   }
